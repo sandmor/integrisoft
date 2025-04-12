@@ -1,0 +1,360 @@
+## Overall Architecture
+
+Next.js provides several advantages for this project:
+
+- Server-side rendering (SSR) for improved performance
+- API routes to handle backend functionality
+- File-based routing for simpler navigation structure
+- Built-in TypeScript support
+- Easy integration with Cloudflare Workers
+
+## Directory Structure
+
+```
+integrisoft/
+├── app/                           # App router structure
+│   ├── api/                       # API routes
+│   │   ├── auth/                  # Authentication endpoints
+│   │   ├── employees/             # HR endpoints
+│   │   ├── finances/              # Finance endpoints
+│   │   ├── products/              # Product management endpoints
+│   │   ├── projects/              # Project management endpoints
+│   │   ├── clients/               # CRM endpoints
+│   │   └── reports/               # Reporting endpoints
+│   ├── (auth)/                    # Authentication routes group
+│   │   ├── login/                 # Login page
+│   │   ├── register/              # New user registration
+│   │   └── reset-password/        # Password reset
+│   ├── dashboard/                 # Dashboard routes
+│   │   ├── page.tsx               # Main dashboard
+│   │   ├── layout.tsx             # Dashboard layout with navigation
+│   │   ├── employees/             # HR module pages
+│   │   ├── finances/              # Finance module pages
+│   │   ├── products/              # Product management pages
+│   │   ├── projects/              # Project management pages
+│   │   ├── clients/               # CRM pages
+│   │   ├── reports/               # Reports and analytics pages
+│   │   └── settings/              # System settings pages
+│   ├── page.tsx                   # Landing page
+│   └── layout.tsx                 # Root layout
+├── components/                    # Reusable components
+│   ├── ui/                        # Basic UI components
+│   ├── forms/                     # Form components
+│   ├── tables/                    # Table components
+│   ├── charts/                    # Data visualization components
+│   ├── layout/                    # Layout components
+│   ├── modals/                    # Modal components
+│   └── notifications/             # Alert/notification components
+├── lib/                           # Utility functions and library code
+│   ├── auth/                      # Authentication utilities
+│   ├── api/                       # API utility functions
+│   ├── db/                        # Database utilities
+│   └── hooks/                     # Custom React hooks
+├── types/                         # TypeScript type definitions
+├── styles/                        # Global styles and theme
+├── public/                        # Static assets
+└── middleware.ts                  # Next.js middleware for auth
+```
+
+## Key Modules and Views
+
+### 1. Authentication Module
+
+**Login Page** (`/login`)
+
+- Login form with email/username and password
+- "Remember me" option
+- Password reset link
+- Error handling for failed authentication
+
+**Registration Page** (`/register`)
+
+- For admin to create new user accounts
+- Form with user details and role selection
+- Validation for required fields
+
+**Password Reset Page** (`/reset-password`)
+
+- Email submission form
+- Token verification
+- New password entry form
+
+### 2. Dashboard (`/dashboard`)
+
+**Main Dashboard**
+
+- Overview statistics for all modules
+- Quick access cards to frequent tasks
+- Recent activity feed
+- Key performance metrics
+- System notifications and alerts
+- Quick search functionality
+
+### 3. Employee Management (`/dashboard/employees`)
+
+**Employee List View**
+
+- Tabular view with sorting and filtering
+- Search functionality
+- Bulk actions (status change, department assignment)
+- Quick view of key employee details
+
+**Employee Detail View** (`/dashboard/employees/[id]`)
+
+- Complete employee profile
+- Employment history
+- Skills and competencies
+- Project assignments
+- Performance metrics
+
+**Employee Form View** (`/dashboard/employees/new` or `/dashboard/employees/[id]/edit`)
+
+- Form for adding/editing employee information
+- Personal details section
+- Employment details section
+- Skills and qualifications section
+- Project assignments section
+
+### 4. Finance Module (`/dashboard/finances`)
+
+**Transactions Dashboard**
+
+- Financial overview with charts
+- Budget vs. actual comparisons
+- Cash flow visualization
+- Recent transactions list
+
+**Transaction List View**
+
+- Filterable table of all transactions
+- Categorization options
+- Export functionality
+- Bulk operations
+
+**Transaction Detail View** (`/dashboard/finances/transactions/[id]`)
+
+- Complete transaction details
+- Related documents
+- Approval flow status
+- Audit trail
+
+**Budget Management View** (`/dashboard/finances/budgets`)
+
+- Budget planning interface
+- Allocation by department/project
+- Budget vs. actual tracking
+- Variance analysis
+
+### 5. Product Management (`/dashboard/products`)
+
+**Products List View**
+
+- Table of all software products
+- Version status indicators
+- Search and filter functionality
+- Quick actions menu
+
+**Product Detail View** (`/dashboard/products/[id]`)
+
+- Product specifications
+- Version history
+- Technical documentation links
+- Dependencies visualization
+- Development metrics
+
+**Version Management View** (`/dashboard/products/[id]/versions`)
+
+- Version lifecycle tracking
+- Release notes management
+- Deployment status
+- QA test results
+
+### 6. Project Management (`/dashboard/projects`)
+
+**Projects Dashboard**
+
+- Active projects overview
+- Resource allocation visualization
+- Project health indicators
+- Timeline view of milestones
+
+**Project List View**
+
+- Filterable table of all projects
+- Status indicators
+- Progress visualization
+- Team size and budget indicators
+
+**Project Detail View** (`/dashboard/projects/[id]`)
+
+- Project overview with timeline
+- Team members and responsibilities
+- Milestones and deliverables
+- Budget status
+- Associated client information
+- Risk indicators
+
+**Task Board View** (`/dashboard/projects/[id]/tasks`)
+
+- Kanban-style task management
+- Task assignment interface
+- Status tracking
+- Time tracking integration
+
+### 7. Client Management (`/dashboard/clients`)
+
+**Client List View**
+
+- Sortable table of all clients
+- Status indicators (active/inactive)
+- Quick contact information
+- Project count and value
+
+**Client Detail View** (`/dashboard/clients/[id]`)
+
+- Client profile and contacts
+- Active projects
+- Contract information
+- Interaction history
+- SLA compliance metrics
+
+**Client Interaction View** (`/dashboard/clients/[id]/interactions`)
+
+- Timeline of all client interactions
+- Communication logs
+- Support tickets
+- Feedback history
+
+### 8. Reports Module (`/dashboard/reports`)
+
+**Reports Dashboard**
+
+- Report templates
+- Recently generated reports
+- Scheduled reports status
+
+**Report Builder View**
+
+- Interactive report creation interface
+- Data source selection
+- Filter configuration
+- Visualization options
+- Export format selection
+
+**Standard Reports Views**
+
+- Financial reports
+- Project performance reports
+- Resource utilization reports
+- Product quality reports
+- Client satisfaction reports
+
+### 9. Settings Module (`/dashboard/settings`)
+
+**User Management View**
+
+- User accounts management
+- Role assignments
+- Permission configuration
+
+**System Configuration View**
+
+- General system settings
+- Notification preferences
+- Integration settings
+
+**Audit Log View**
+
+- System-wide activity log
+- Filterable by user, action, module
+- Timestamp information
+
+## Component Architecture
+
+### Core Reusable Components
+
+**DataTable Component**
+
+- Used across all list views
+- Features:
+  - Pagination
+  - Sorting
+  - Filtering
+  - Column customization
+  - Selection for bulk actions
+  - Export functionality
+
+**Form Components**
+
+- Input fields with validation
+- Select components with search
+- Date pickers
+- File uploaders
+- Rich text editors
+
+**Chart Components**
+
+- Line charts for time-series data
+- Bar charts for comparisons
+- Pie/Donut charts for distributions
+- Gauge charts for KPIs
+- Area charts for cumulative values
+
+**Layout Components**
+
+- Sidebar navigation
+- Header with user menu
+- Breadcrumb navigation
+- Page layouts (single column, two column, etc.)
+
+**Modal Components**
+
+- Confirmation dialogs
+- Form modals
+- Information modals
+- Alert modals
+
+**Card Components**
+
+- Stat cards for KPIs
+- Info cards for dashboards
+- Action cards for quick tasks
+
+## UI/UX Considerations
+
+**Consistent Design System**
+
+- Color palette based on company branding
+- Typography system with hierarchical scales
+- Spacing system for consistent layout
+- Component design consistency across modules
+
+**Responsive Design**
+
+- Mobile-friendly layouts
+- Adapted views for tablets
+- Full functionality on desktop
+- Print-friendly views for reports
+
+**Accessibility**
+
+- ARIA labels for screen readers
+- Keyboard navigation support
+- Sufficient color contrast
+- Focus state indicators
+
+## API Integration
+
+**Data Fetching Strategy**
+
+- Server Components for initial data load
+- React Query for client-side data fetching
+- Optimistic updates for better UX
+- Caching strategy for frequent data
+
+**Authentication Flow**
+
+- JWT stored in HTTP-only cookies
+- Role-based page access control
+- Token refresh mechanism
+- Secure API routes

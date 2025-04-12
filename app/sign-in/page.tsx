@@ -11,14 +11,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useRouter } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 export default function LoginPage() {
   const router = useRouter();
   useEffect(() => {
     client.getSession().then((session) => {
-      if (session) {
+      if (session.data) {
         router.push("/");
       }
     });
@@ -43,8 +43,9 @@ export default function LoginPage() {
               });
               if (error) {
                 return { error: error.message ?? "An error occurred" };
+              } else {
+                redirect("/dashboard");
               }
-              return {};
             }}
           />
         </CardContent>

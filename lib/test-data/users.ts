@@ -3,6 +3,7 @@ import { faker } from "@faker-js/faker";
 import { createId } from "@paralleldrive/cuid2";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
+import { auth } from "../auth";
 
 // Generate users with different roles
 export async function generateUsers(
@@ -11,6 +12,7 @@ export async function generateUsers(
 ): Promise<string[]> {
   const userIds: string[] = [];
   const roles = ["admin", "manager", "employee"] as const;
+  const password = await (await auth.$context).password.hash("MyPassword123");
 
   // Create admin user first
   const adminUser = {
@@ -37,9 +39,8 @@ export async function generateUsers(
       id: createId(),
       userId: adminUser.id,
       accountId: adminUser.id,
-      providerId: "credentials",
-      password:
-        "6decc2b8e223c5032bb2dfa0dd3bc790:ce7f8c8a1ba71cf3ba69886f29c7e1b5a5815c057592eafb815efa377c99c14b3d6ec57c68ac97dce6ca3f9368f90969a754289deec4f33cc24334be1001f95a", // password: '123456789'
+      providerId: "credential",
+      password: password,
     })
     .execute();
 
@@ -83,8 +84,8 @@ export async function generateUsers(
           id: createId(),
           userId: userId,
           accountId: userId,
-          providerId: "credentials",
-          password: "",
+          providerId: "credential",
+          password: password,
           createdAt: faker.date.past({ years: 1 }),
           updatedAt: faker.date.recent({ days: 30 }),
         })
@@ -106,7 +107,7 @@ export async function generateUsers(
           accessToken: faker.string.alphanumeric(40),
           refreshToken: faker.string.alphanumeric(40),
           accessTokenExpiresAt: faker.date.future({ years: 1 }),
-          password: "", // Required field
+          password: password,
           createdAt: faker.date.past({ years: 1 }),
           updatedAt: faker.date.recent({ days: 30 }),
         })

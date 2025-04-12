@@ -70,9 +70,9 @@ export const users = pgTable("users", {
   lastName: varchar("last_name", { length: 100 }).notNull(),
   role: userRoleEnum("role").notNull().default("employee"),
   isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  lastLogin: timestamp("last_login"),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  lastLogin: timestamp("last_login", { mode: "date" }),
   isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
@@ -86,11 +86,11 @@ export const sessions = pgTable("sessions", {
     .notNull()
     .references(() => users.id),
   token: varchar("session_token", { length: 255 }).notNull().unique(),
-  expiresAt: timestamp("expires").notNull(),
+  expiresAt: timestamp("expires", { mode: "date" }).notNull(),
   ipAddress: varchar("ip_address", { length: 50 }),
   userAgent: text("user_agent"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });
 
 // Accounts table
@@ -106,13 +106,13 @@ export const accounts = pgTable("accounts", {
   providerId: varchar("provider_id", { length: 255 }).notNull(),
   accessToken: varchar("access_token", { length: 255 }),
   refreshToken: varchar("refresh_token", { length: 255 }),
-  accessTokenExpiresAt: timestamp("access_token_expires"),
-  refreshTokenExpiresAt: timestamp("refresh_token_expires"),
+  accessTokenExpiresAt: timestamp("access_token_expires", { mode: "date" }),
+  refreshTokenExpiresAt: timestamp("refresh_token_expires", { mode: "date" }),
   scope: varchar("scope", { length: 255 }),
   idToken: varchar("id_token", { length: 255 }),
   password: varchar("password", { length: 255 }).notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });
 
 // User verification table
@@ -123,9 +123,9 @@ export const verifications = pgTable("user_verifications", {
     .$defaultFn(() => createId()),
   identifier: varchar("identifier", { length: 255 }).notNull(),
   value: varchar("value", { length: 255 }).notNull(),
-  expiresAt: timestamp("expires").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires", { mode: "date" }).notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });
 
 // Permissions table
@@ -138,8 +138,8 @@ export const permissions = pgTable("permissions", {
   description: text("description"),
   module: varchar("module", { length: 50 }).notNull(),
   action: varchar("action", { length: 50 }).notNull(), // create, read, update, delete
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });
 
 // Role permissions mapping
@@ -154,8 +154,8 @@ export const rolePermissions = pgTable(
     permissionId: text("permission_id")
       .notNull()
       .references(() => permissions.id),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   },
   (table) => {
     return {
@@ -180,8 +180,8 @@ export const departments = pgTable("departments", {
   managerId: text("manager_id").references((): AnyPgColumn => employees.id, {
     onDelete: "set null",
   }),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
@@ -196,8 +196,8 @@ export const positions = pgTable("positions", {
   departmentId: text("department_id").references(
     (): AnyPgColumn => departments.id
   ),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
@@ -210,8 +210,8 @@ export const skills = pgTable("skills", {
   name: varchar("name", { length: 100 }).notNull().unique(),
   category: varchar("category", { length: 50 }).notNull(),
   description: text("description"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
@@ -232,8 +232,8 @@ export const employees = pgTable("employees", {
   contactPhone: varchar("contact_phone", { length: 30 }),
   address: text("address"),
   emergencyContact: text("emergency_contact"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
@@ -253,8 +253,8 @@ export const employeeSkills = pgTable(
       .references(() => skills.id),
     proficiencyLevel: integer("proficiency_level").notNull().default(1), // 1-5 scale
     yearsExperience: decimal("years_experience", { precision: 4, scale: 1 }),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   },
   (table) => {
     return {
@@ -278,8 +278,8 @@ export const costCenters = pgTable("cost_centers", {
   description: text("description"),
   budget: decimal("budget", { precision: 15, scale: 2 }),
   departmentId: text("department_id").references(() => departments.id),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
@@ -295,8 +295,8 @@ export const transactionCategories = pgTable("transaction_categories", {
   parentCategoryId: text("parent_category_id").references(
     (): AnyPgColumn => transactionCategories.id
   ),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
@@ -309,15 +309,15 @@ export const transactions = pgTable("transactions", {
   type: transactionTypeEnum("type").notNull(),
   amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
   description: text("description"),
-  date: timestamp("date").notNull(),
+  date: timestamp("date", { mode: "date" }).notNull(),
   categoryId: text("category_id").references(() => transactionCategories.id),
   costCenterId: text("cost_center_id").references(() => costCenters.id),
   projectId: text("project_id").references(() => projects.id),
   createdById: text("created_by_id").references(() => users.id),
   approvedById: text("approved_by_id").references(() => users.id),
-  approvedAt: timestamp("approved_at"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  approvedAt: timestamp("approved_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
@@ -335,8 +335,8 @@ export const budgets = pgTable("budgets", {
   projectId: text("project_id").references(() => projects.id),
   description: text("description"),
   createdById: text("created_by_id").references(() => users.id),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
@@ -354,8 +354,8 @@ export const products = pgTable("products", {
   documentationUrl: varchar("documentation_url", { length: 255 }),
   productManager: text("product_manager").references(() => employees.id),
   techLead: text("tech_lead").references(() => employees.id),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
@@ -375,8 +375,8 @@ export const productVersions = pgTable(
     releaseDate: date("release_date", { mode: "date" }),
     releaseNotes: text("release_notes"),
     createdById: text("created_by_id").references(() => users.id),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
     isDeleted: boolean("is_deleted").notNull().default(false),
   },
   (table) => {
@@ -402,8 +402,8 @@ export const technicalSpecs = pgTable("technical_specs", {
   name: varchar("name", { length: 100 }).notNull(),
   content: text("content").notNull(),
   createdById: text("created_by_id").references(() => users.id),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
@@ -424,8 +424,8 @@ export const productDependencies = pgTable(
     versionConstraint: varchar("version_constraint", { length: 50 }),
     description: text("description"),
     isCritical: boolean("is_critical").notNull().default(false),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   },
   (table) => {
     return {
@@ -456,8 +456,8 @@ export const projects = pgTable("projects", {
   budget: decimal("budget", { precision: 15, scale: 2 }),
   managerId: text("manager_id").references(() => employees.id),
   createdById: text("created_by_id").references(() => users.id),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
@@ -475,8 +475,8 @@ export const milestones = pgTable("milestones", {
   dueDate: date("due_date", { mode: "date" }).notNull(),
   completedDate: date("completed_date", { mode: "date" }),
   isCompleted: boolean("is_completed").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
@@ -501,8 +501,8 @@ export const tasks = pgTable("tasks", {
   dueDate: date("due_date", { mode: "date" }),
   startDate: date("start_date", { mode: "date" }),
   completedDate: date("completed_date", { mode: "date" }),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
@@ -526,8 +526,8 @@ export const projectTeamMembers = pgTable(
       .default(100),
     startDate: date("start_date", { mode: "date" }).notNull(),
     endDate: date("end_date", { mode: "date" }),
-    createdAt: timestamp("created_at").notNull().defaultNow(),
-    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
     isDeleted: boolean("is_deleted").notNull().default(false),
   },
   (table) => {
@@ -554,8 +554,8 @@ export const clients = pgTable("clients", {
   address: text("address"),
   accountManagerId: text("account_manager_id").references(() => employees.id),
   createdById: text("created_by_id").references(() => users.id),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
@@ -574,8 +574,8 @@ export const clientContacts = pgTable("client_contacts", {
   email: varchar("email", { length: 255 }),
   phone: varchar("phone", { length: 30 }),
   isPrimary: boolean("is_primary").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
@@ -597,8 +597,8 @@ export const contracts = pgTable("contracts", {
   termsAndConditions: text("terms_and_conditions"),
   status: varchar("status", { length: 50 }).notNull().default("draft"),
   createdById: text("created_by_id").references(() => users.id),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
@@ -614,14 +614,14 @@ export const clientInteractions = pgTable("client_interactions", {
   contactId: text("contact_id").references(() => clientContacts.id),
   employeeId: text("employee_id").references(() => employees.id),
   type: varchar("type", { length: 50 }).notNull(), // email, call, meeting, etc.
-  date: timestamp("date").notNull(),
+  date: timestamp("date", { mode: "date" }).notNull(),
   summary: text("summary").notNull(),
   details: text("details"),
   followUpDate: date("follow_up_date", { mode: "date" }),
   followUpNotes: text("follow_up_notes"),
   createdById: text("created_by_id").references(() => users.id),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
@@ -646,8 +646,8 @@ export const serviceLevelAgreements = pgTable("service_level_agreements", {
   startDate: date("start_date", { mode: "date" }).notNull(),
   endDate: date("end_date", { mode: "date" }),
   createdById: text("created_by_id").references(() => users.id),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
@@ -665,7 +665,7 @@ export const systemLogs = pgTable("system_logs", {
   details: json("details"),
   ipAddress: varchar("ip_address", { length: 50 }),
   userAgent: text("user_agent"),
-  timestamp: timestamp("timestamp").notNull().defaultNow(),
+  timestamp: timestamp("timestamp", { mode: "date" }).notNull().defaultNow(),
 });
 
 // Change history
@@ -679,7 +679,7 @@ export const changeHistory = pgTable("change_history", {
   action: varchar("action", { length: 20 }).notNull(), // create, update, delete
   changes: json("changes"),
   userId: text("user_id").references(() => users.id),
-  timestamp: timestamp("timestamp").notNull().defaultNow(),
+  timestamp: timestamp("timestamp", { mode: "date" }).notNull().defaultNow(),
 });
 
 // ==================== REPORTS AND METRICS ====================
@@ -696,8 +696,8 @@ export const savedReports = pgTable("saved_reports", {
   parameters: json("parameters"),
   createdById: text("created_by_id").references(() => users.id),
   isPublic: boolean("is_public").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
@@ -714,7 +714,7 @@ export const metrics = pgTable("metrics", {
   date: date("date", { mode: "date" }).notNull(),
   entityType: varchar("entity_type", { length: 50 }),
   entityId: text("entity_id"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   metadata: json("metadata"),
 });
 
@@ -735,7 +735,7 @@ export const notifications = pgTable("notifications", {
   isRead: boolean("is_read").notNull().default(false),
   entityType: varchar("entity_type", { length: 50 }),
   entityId: text("entity_id"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
 });
 
 // ==================== SETTINGS ====================
@@ -751,8 +751,8 @@ export const systemSettings = pgTable("system_settings", {
   description: text("description"),
   category: varchar("category", { length: 50 }).notNull(),
   isPublic: boolean("is_public").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });
 
 // Export relationships for better type safety with Drizzle

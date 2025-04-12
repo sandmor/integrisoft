@@ -13,6 +13,7 @@ import {
   AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
+import { relations } from "drizzle-orm";
 
 // ==================== ENUMS ====================
 
@@ -176,7 +177,9 @@ export const departments = pgTable("departments", {
     .$defaultFn(() => createId()),
   name: varchar("name", { length: 100 }).notNull(),
   description: text("description"),
-  managerId: text("manager_id").references((): AnyPgColumn => employees.id),
+  managerId: text("manager_id").references((): AnyPgColumn => employees.id, {
+    onDelete: "set null",
+  }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   isDeleted: boolean("is_deleted").notNull().default(false),
@@ -223,10 +226,10 @@ export const employees = pgTable("employees", {
     .unique(),
   positionId: text("position_id").references(() => positions.id),
   departmentId: text("department_id").references(() => departments.id),
-  hireDate: date("hire_date").notNull(),
+  hireDate: date("hire_date", { mode: "date" }).notNull(),
   salary: decimal("salary", { precision: 10, scale: 2 }),
   contactEmail: varchar("contact_email", { length: 255 }),
-  contactPhone: varchar("contact_phone", { length: 20 }),
+  contactPhone: varchar("contact_phone", { length: 30 }),
   address: text("address"),
   emergencyContact: text("emergency_contact"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -326,8 +329,8 @@ export const budgets = pgTable("budgets", {
     .$defaultFn(() => createId()),
   name: varchar("name", { length: 100 }).notNull(),
   amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
-  startDate: date("start_date").notNull(),
-  endDate: date("end_date").notNull(),
+  startDate: date("start_date", { mode: "date" }).notNull(),
+  endDate: date("end_date", { mode: "date" }).notNull(),
   costCenterId: text("cost_center_id").references(() => costCenters.id),
   projectId: text("project_id").references(() => projects.id),
   description: text("description"),
@@ -369,7 +372,7 @@ export const productVersions = pgTable(
       .references(() => products.id),
     versionNumber: varchar("version_number", { length: 50 }).notNull(),
     status: versionStatusEnum("status").notNull().default("development"),
-    releaseDate: date("release_date"),
+    releaseDate: date("release_date", { mode: "date" }),
     releaseNotes: text("release_notes"),
     createdById: text("created_by_id").references(() => users.id),
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -445,9 +448,9 @@ export const projects = pgTable("projects", {
   name: varchar("name", { length: 100 }).notNull(),
   description: text("description"),
   status: projectStatusEnum("status").notNull().default("planning"),
-  startDate: date("start_date"),
-  targetEndDate: date("target_end_date"),
-  actualEndDate: date("actual_end_date"),
+  startDate: date("start_date", { mode: "date" }),
+  targetEndDate: date("target_end_date", { mode: "date" }),
+  actualEndDate: date("actual_end_date", { mode: "date" }),
   clientId: text("client_id").references(() => clients.id),
   productId: text("product_id").references(() => products.id),
   budget: decimal("budget", { precision: 15, scale: 2 }),
@@ -469,8 +472,8 @@ export const milestones = pgTable("milestones", {
     .references(() => projects.id),
   name: varchar("name", { length: 100 }).notNull(),
   description: text("description"),
-  dueDate: date("due_date").notNull(),
-  completedDate: date("completed_date"),
+  dueDate: date("due_date", { mode: "date" }).notNull(),
+  completedDate: date("completed_date", { mode: "date" }),
   isCompleted: boolean("is_completed").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -495,9 +498,9 @@ export const tasks = pgTable("tasks", {
   createdById: text("created_by_id").references(() => users.id),
   estimatedHours: decimal("estimated_hours", { precision: 6, scale: 2 }),
   actualHours: decimal("actual_hours", { precision: 6, scale: 2 }),
-  dueDate: date("due_date"),
-  startDate: date("start_date"),
-  completedDate: date("completed_date"),
+  dueDate: date("due_date", { mode: "date" }),
+  startDate: date("start_date", { mode: "date" }),
+  completedDate: date("completed_date", { mode: "date" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   isDeleted: boolean("is_deleted").notNull().default(false),
@@ -521,8 +524,8 @@ export const projectTeamMembers = pgTable(
     allocationPercentage: integer("allocation_percentage")
       .notNull()
       .default(100),
-    startDate: date("start_date").notNull(),
-    endDate: date("end_date"),
+    startDate: date("start_date", { mode: "date" }).notNull(),
+    endDate: date("end_date", { mode: "date" }),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
     isDeleted: boolean("is_deleted").notNull().default(false),
@@ -569,7 +572,7 @@ export const clientContacts = pgTable("client_contacts", {
   lastName: varchar("last_name", { length: 100 }).notNull(),
   position: varchar("position", { length: 100 }),
   email: varchar("email", { length: 255 }),
-  phone: varchar("phone", { length: 20 }),
+  phone: varchar("phone", { length: 30 }),
   isPrimary: boolean("is_primary").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -588,8 +591,8 @@ export const contracts = pgTable("contracts", {
   projectId: text("project_id").references(() => projects.id),
   title: varchar("title", { length: 200 }).notNull(),
   description: text("description"),
-  startDate: date("start_date").notNull(),
-  endDate: date("end_date"),
+  startDate: date("start_date", { mode: "date" }).notNull(),
+  endDate: date("end_date", { mode: "date" }),
   value: decimal("value", { precision: 15, scale: 2 }),
   termsAndConditions: text("terms_and_conditions"),
   status: varchar("status", { length: 50 }).notNull().default("draft"),
@@ -614,7 +617,7 @@ export const clientInteractions = pgTable("client_interactions", {
   date: timestamp("date").notNull(),
   summary: text("summary").notNull(),
   details: text("details"),
-  followUpDate: date("follow_up_date"),
+  followUpDate: date("follow_up_date", { mode: "date" }),
   followUpNotes: text("follow_up_notes"),
   createdById: text("created_by_id").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -640,8 +643,8 @@ export const serviceLevelAgreements = pgTable("service_level_agreements", {
     scale: 2,
   }),
   uptimePercentage: decimal("uptime_percentage", { precision: 5, scale: 2 }),
-  startDate: date("start_date").notNull(),
-  endDate: date("end_date"),
+  startDate: date("start_date", { mode: "date" }).notNull(),
+  endDate: date("end_date", { mode: "date" }),
   createdById: text("created_by_id").references(() => users.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -708,7 +711,7 @@ export const metrics = pgTable("metrics", {
   category: varchar("category", { length: 50 }).notNull(),
   value: decimal("value", { precision: 15, scale: 5 }).notNull(),
   unit: varchar("unit", { length: 20 }),
-  date: date("date").notNull(),
+  date: date("date", { mode: "date" }).notNull(),
   entityType: varchar("entity_type", { length: 50 }),
   entityId: text("entity_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -753,128 +756,75 @@ export const systemSettings = pgTable("system_settings", {
 });
 
 // Export relationships for better type safety with Drizzle
-export const usersRelations = {
-  employees: {
-    one: {
-      employee: {
-        foreignKey: [employees.userId],
-        references: [users.id],
-      },
-    },
-  },
-};
+export const usersRelations = relations(users, ({ one }) => ({
+  employees: one(employees, {
+    fields: [users.id],
+    references: [employees.userId],
+  }),
+}));
 
-export const employeesRelations = {
-  users: {
-    one: {
-      user: {
-        foreignKey: [employees.userId],
-        references: [users.id],
-      },
-    },
-  },
-  departments: {
-    one: {
-      department: {
-        foreignKey: [employees.departmentId],
-        references: [departments.id],
-      },
-    },
-  },
-  positions: {
-    one: {
-      position: {
-        foreignKey: [employees.positionId],
-        references: [positions.id],
-      },
-    },
-  },
-};
+export const employeesRelations = relations(employees, ({ one }) => ({
+  users: one(users, {
+    fields: [employees.userId],
+    references: [users.id],
+  }),
+  departments: one(departments, {
+    fields: [employees.departmentId],
+    references: [departments.id],
+  }),
+  positions: one(positions, {
+    fields: [employees.positionId],
+    references: [positions.id],
+  }),
+}));
 
-export const projectsRelations = {
-  clients: {
-    one: {
-      client: {
-        foreignKey: [projects.clientId],
-        references: [clients.id],
-      },
-    },
-  },
-  employees: {
-    one: {
-      manager: {
-        foreignKey: [projects.managerId],
-        references: [employees.id],
-      },
-    },
-    many: {
-      teamMembers: {
-        through: {
-          foreignKey: [
-            projectTeamMembers.projectId,
-            projectTeamMembers.employeeId,
-          ],
-          references: [projects.id, employees.id],
-        },
-      },
-    },
-  },
-  products: {
-    one: {
-      product: {
-        foreignKey: [projects.productId],
-        references: [products.id],
-      },
-    },
-  },
-};
+export const departmentsRelations = relations(departments, ({ one }) => ({
+  manager: one(employees, {
+    fields: [departments.managerId],
+    references: [employees.id],
+    relationName: "manager",
+  }),
+}));
 
-export const clientsRelations = {
-  employees: {
-    one: {
-      accountManager: {
-        foreignKey: [clients.accountManagerId],
-        references: [employees.id],
-      },
-    },
-  },
-  projects: {
-    many: {
-      projects: {
-        foreignKey: [projects.clientId],
-        references: [clients.id],
-      },
-    },
-  },
-};
+export const projectsRelations = relations(projects, ({ one, many }) => ({
+  clients: one(clients, {
+    fields: [projects.clientId],
+    references: [clients.id],
+  }),
+  employees: one(employees, {
+    fields: [projects.managerId],
+    references: [employees.id],
+    relationName: "manager",
+  }),
+  teamMembers: many(projectTeamMembers, {
+    relationName: "teamMembers",
+  }),
+  products: one(products, {
+    fields: [projects.productId],
+    references: [products.id],
+  }),
+}));
 
-export const productsRelations = {
-  employees: {
-    one: {
-      productManager: {
-        foreignKey: [products.productManager],
-        references: [employees.id],
-      },
-      techLead: {
-        foreignKey: [products.techLead],
-        references: [employees.id],
-      },
-    },
-  },
-  projects: {
-    many: {
-      projects: {
-        foreignKey: [projects.productId],
-        references: [products.id],
-      },
-    },
-  },
-  productVersions: {
-    many: {
-      versions: {
-        foreignKey: [productVersions.productId],
-        references: [products.id],
-      },
-    },
-  },
-};
+export const clientsRelations = relations(clients, ({ one, many }) => ({
+  employees: one(employees, {
+    fields: [clients.accountManagerId],
+    references: [employees.id],
+    relationName: "accountManager",
+  }),
+  projects: many(projects),
+}));
+
+export const productsRelations = relations(products, ({ one, many }) => ({
+  employees: one(employees, {
+    fields: [products.productManager],
+    references: [employees.id],
+    relationName: "productManager",
+  }),
+  techLead: one(employees, {
+    fields: [products.techLead],
+    references: [employees.id],
+    relationName: "techLead",
+  }),
+  projects: many(projects),
+  versions: many(productVersions),
+}));

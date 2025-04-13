@@ -653,8 +653,8 @@ export const serviceLevelAgreements = pgTable("service_level_agreements", {
 
 // ==================== AUDITING AND LOGGING ====================
 
-// System logs
-export const systemLogs = pgTable("system_logs", {
+// Activities Feed
+export const activitiesFeed = pgTable("activities_feed", {
   id: text("id")
     .primaryKey()
     .notNull()
@@ -662,10 +662,28 @@ export const systemLogs = pgTable("system_logs", {
   userId: text("user_id").references(() => users.id),
   action: varchar("action", { length: 100 }).notNull(),
   module: varchar("module", { length: 50 }).notNull(),
-  details: json("details"),
+  description: text("description"),
+  // Entity references to support various activity types
+  projectId: text("project_id").references(() => projects.id),
+  productId: text("product_id").references(() => products.id),
+  clientId: text("client_id").references(() => clients.id),
+  employeeId: text("employee_id").references(() => employees.id),
+  taskId: text("task_id").references(() => tasks.id),
+  milestoneId: text("milestone_id").references(() => milestones.id),
+  // Related entity information for complex activities
+  relatedEntityType: varchar("related_entity_type", { length: 50 }),
+  relatedEntityId: text("related_entity_id"),
+  // Custom fields for UI representation
+  icon: varchar("icon", { length: 50 }), // Custom icon for this activity
+  color: varchar("color", { length: 20 }), // Color code for UI highlighting
+  priority: integer("priority").default(0), // For sorting/highlighting important activities
+  tags: text("tags").array(), // Array of tags for filtering activities
+  details: json("details"), // Structured data about the activity
+  // User agent and IP address for tracking
   ipAddress: varchar("ip_address", { length: 50 }),
   userAgent: text("user_agent"),
   timestamp: timestamp("timestamp", { mode: "date" }).notNull().defaultNow(),
+  isSystem: boolean("is_system").notNull().default(false),
 });
 
 // Change history
@@ -827,4 +845,35 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   }),
   projects: many(projects),
   versions: many(productVersions),
+}));
+
+export const systemLogsRelations = relations(activitiesFeed, ({ one }) => ({
+  user: one(users, {
+    fields: [activitiesFeed.userId],
+    references: [users.id],
+  }),
+  project: one(projects, {
+    fields: [activitiesFeed.projectId],
+    references: [projects.id],
+  }),
+  product: one(products, {
+    fields: [activitiesFeed.productId],
+    references: [products.id],
+  }),
+  client: one(clients, {
+    fields: [activitiesFeed.clientId],
+    references: [clients.id],
+  }),
+  employee: one(employees, {
+    fields: [activitiesFeed.employeeId],
+    references: [employees.id],
+  }),
+  task: one(tasks, {
+    fields: [activitiesFeed.taskId],
+    references: [tasks.id],
+  }),
+  milestone: one(milestones, {
+    fields: [activitiesFeed.milestoneId],
+    references: [milestones.id],
+  }),
 }));

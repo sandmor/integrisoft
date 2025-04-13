@@ -11,7 +11,7 @@ export async function clearAllData(
   await tx.delete(schema.metrics).execute();
   await tx.delete(schema.systemSettings).execute();
   await tx.delete(schema.changeHistory).execute();
-  await tx.delete(schema.systemLogs).execute();
+  await tx.delete(schema.activitiesFeed).execute();
   await tx.delete(schema.serviceLevelAgreements).execute();
   await tx.delete(schema.clientInteractions).execute();
   await tx.delete(schema.contracts).execute();

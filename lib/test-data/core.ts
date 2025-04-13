@@ -36,12 +36,11 @@ import {
   generateTasks,
   generateProjectTeamMembers,
 } from "./projects";
-import {
-  generateSystemSettings,
-  generateMetrics,
-  generateSavedReports,
-  generateNotifications,
-} from "./system";
+import { generateSystemSettings } from "./settings";
+import { generateMetrics } from "./metrics";
+import { generateSavedReports } from "./reports";
+import { generateNotifications } from "./notifications";
+import { generateActivities } from "./activities";
 
 // This function generates a complete fictional company with test data
 export async function populateTestData(
@@ -188,6 +187,16 @@ export async function populateTestData(
 
     console.log("Generating notifications...");
     await generateNotifications(tx, userIds, projectIds);
+
+    console.log("Generating activities feed...");
+    await generateActivities(
+      tx,
+      userIds,
+      employeeIds,
+      projectIds,
+      productIds,
+      clientIds
+    );
 
     console.log("Test data generation completed successfully!");
 

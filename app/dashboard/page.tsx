@@ -14,6 +14,16 @@ import {
   CheckCircle,
   Clock,
   AlertTriangle,
+  User,
+  CheckSquare,
+  Package,
+  DollarSign,
+  Network,
+  FileText,
+  BarChart,
+  Settings,
+  Circle,
+  ArrowRight,
 } from "lucide-react";
 import {
   getDashboardStats,
@@ -24,10 +34,41 @@ import {
   type DashboardTask,
   type ActivityItem,
 } from "@/lib/actions/dashboard";
-import { formatRelativeTime } from "@/lib/utils";
+import {
+  formatRelativeTime,
+  getModuleDisplayInfo,
+  getActivityActionColor,
+  formatActivityDescription,
+} from "@/lib/utils";
 import { Suspense } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import { tryCatch } from "@/lib/error-handler";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+
+// Icon mapping component to render dynamic icons
+const DynamicIcon = ({
+  name,
+  className,
+}: {
+  name: string;
+  className?: string;
+}) => {
+  const iconMap: Record<string, React.ReactNode> = {
+    Briefcase: <Briefcase className={className || "size-4"} />,
+    CheckSquare: <CheckSquare className={className || "size-4"} />,
+    Package: <Package className={className || "size-4"} />,
+    Building2: <Building2 className={className || "size-4"} />,
+    Users: <Users className={className || "size-4"} />,
+    User: <User className={className || "size-4"} />,
+    DollarSign: <DollarSign className={className || "size-4"} />,
+    Network: <Network className={className || "size-4"} />,
+    FileText: <FileText className={className || "size-4"} />,
+    BarChart: <BarChart className={className || "size-4"} />,
+    Settings: <Settings className={className || "size-4"} />,
+  };
+
+  return iconMap[name] || <Circle className={className || "size-4"} />;
+};
 
 interface StatCardProps {
   title: string;
@@ -116,6 +157,7 @@ function ActivityFeed({ activities }: ActivityFeedProps) {
         <CardTitle className="flex items-center gap-2">
           <Activity className="size-5" /> Recent Activity
         </CardTitle>
+        <CardDescription>Latest activities across the platform</CardDescription>
       </CardHeader>
       <CardContent>
         {activities.length === 0 ? (
@@ -124,21 +166,67 @@ function ActivityFeed({ activities }: ActivityFeedProps) {
           </div>
         ) : (
           <div className="space-y-4">
-            {activities.map((activity) => (
-              <div key={activity.id} className="flex items-start gap-3">
-                <div className="mt-0.5 size-2 rounded-full bg-primary" />
-                <div>
-                  <p className="text-sm font-medium">{activity.action}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {activity.target}
+            {activities.map((activity) => {
+              const moduleInfo = getModuleDisplayInfo(activity.module);
+              const actionColor = getActivityActionColor(activity.action);
+
+              return (
+                <div key={activity.id} className="flex items-start gap-3">
+                  <div
+                    className={`bg-primary/10 text-primary p-1.5 rounded-full mt-0.5`}
+                  >
+                    <DynamicIcon name={moduleInfo.icon} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      {activity.userName && (
+                        <Avatar className="size-6">
+                          <AvatarFallback className="text-xs bg-secondary text-secondary-foreground">
+                            {activity.userName
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                      )}
+                      <p className="text-sm font-medium">
+                        <span className={`font-semibold ${actionColor}`}>
+                          {activity.action}
+                        </span>
+                        {activity.description ? (
+                          <span className="ml-1">{activity.description}</span>
+                        ) : (
+                          <span className="ml-1">
+                            in{" "}
+                            <span className="font-medium">
+                              {moduleInfo.label}
+                            </span>
+                            {activity.details &&
+                              typeof activity.details === "object" &&
+                              activity.details.name && (
+                                <span className="ml-1">
+                                  - {activity.details.name}
+                                </span>
+                              )}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    {activity.entityType && activity.entityId && (
+                      <div className="mt-1 flex items-center text-xs text-muted-foreground">
+                        <span className="flex items-center">
+                          <ArrowRight className="size-3 mr-1" />
+                          {activity.entityType}: {activity.entityId}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs whitespace-nowrap text-muted-foreground">
+                    {formatRelativeTime(activity.time)}
                   </p>
                 </div>
-                <div className="flex-1" />
-                <p className="text-xs text-muted-foreground">
-                  {formatRelativeTime(activity.time)}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </CardContent>

@@ -9,9 +9,10 @@ import {
   tasks,
   products,
   clientInteractions,
-  systemLogs,
+  activitiesFeed,
+  users,
 } from "@/lib/db/schema";
-import { eq, and, gte, desc, count, sum, lte } from "drizzle-orm";
+import { eq, and, gte, desc, count, sum, lte, inArray } from "drizzle-orm";
 import {
   transactionTypeEnum,
   projectStatusEnum,
@@ -40,9 +41,14 @@ export type DashboardTask = {
 export type ActivityItem = {
   id: string;
   action: string;
-  target: string;
+  module: string;
   time: Date;
   user?: string;
+  description?: string;
+  entityType?: string;
+  entityId?: string;
+  details?: any;
+  userName?: string;
 };
 
 function calculatePercentageChange(current: number, previous: number): number {
@@ -246,22 +252,59 @@ export async function getClientRequests(): Promise<DashboardTask[]> {
 export async function getRecentActivities(): Promise<ActivityItem[]> {
   const results = await db
     .select({
-      id: systemLogs.id,
-      action: systemLogs.action,
-      module: systemLogs.module,
-      timestamp: systemLogs.timestamp,
-      userId: systemLogs.userId,
+      id: activitiesFeed.id,
+      action: activitiesFeed.action,
+      module: activitiesFeed.module,
+      timestamp: activitiesFeed.timestamp,
+      userId: activitiesFeed.userId,
+      description: activitiesFeed.description,
+      entityType: activitiesFeed.relatedEntityType,
+      entityId: activitiesFeed.relatedEntityId,
+      details: activitiesFeed.details,
+      projectId: activitiesFeed.projectId,
+      productId: activitiesFeed.productId,
+      clientId: activitiesFeed.clientId,
+      employeeId: activitiesFeed.employeeId,
+      taskId: activitiesFeed.taskId,
+      milestoneId: activitiesFeed.milestoneId,
     })
-    .from(systemLogs)
-    .orderBy(desc(systemLogs.timestamp))
+    .from(activitiesFeed)
+    .orderBy(desc(activitiesFeed.timestamp))
     .limit(10);
+
+  // Get user names for the activities
+  const userIds = results
+    .map((log) => log.userId)
+    .filter((id): id is string => id !== null && id !== undefined);
+
+  const userResults =
+    userIds.length > 0
+      ? await db
+          .select({
+            id: users.id,
+            name: users.name,
+            lastName: users.lastName,
+          })
+          .from(users)
+          .where(inArray(users.id, userIds))
+      : [];
+
+  // Create a map for quick lookup
+  const userMap = new Map(
+    userResults.map((user) => [user.id, `${user.name} ${user.lastName}`])
+  );
 
   return results.map((log) => ({
     id: log.id,
     action: log.action,
-    target: log.module,
+    module: log.module,
     time: log.timestamp,
     user: log.userId || undefined,
+    userName: log.userId ? userMap.get(log.userId) : undefined,
+    description: log.description || undefined,
+    entityType: log.entityType || undefined,
+    entityId: log.entityId || undefined,
+    details: log.details || undefined,
   }));
 }
 

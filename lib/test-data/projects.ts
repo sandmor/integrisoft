@@ -212,6 +212,7 @@ export async function generateProjects(
       .insert(schema.projects)
       .values([
         {
+          id: projectId,
           name: projectName,
           description: `${projectName}: ${faker.lorem.paragraph()}`,
           status: status as any,
@@ -329,6 +330,7 @@ export async function generateMilestones(
         .insert(schema.milestones)
         .values([
           {
+            id: milestoneId,
             projectId: projectId,
             name: name,
             description: description,
@@ -580,6 +582,7 @@ export async function generateTasks(
         .insert(schema.tasks)
         .values([
           {
+            id: taskId,
             projectId: projectId,
             milestoneId: milestoneId,
             title: title,
@@ -732,6 +735,7 @@ export async function generateProjectTeamMembers(
         .insert(schema.projectTeamMembers)
         .values([
           {
+            id: teamMemberId,
             projectId: projectId,
             employeeId: employeeId,
             role: role,

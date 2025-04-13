@@ -1,17 +1,17 @@
-"use client";
-
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import {
   getEmployee,
+  NewEmployeeData,
   updateEmployee,
-  type UpdateEmployeeData,
+  getDepartments,
+  getPositions,
+  Department,
+  Position,
 } from "@/lib/actions/employees";
 import { EmployeeForm } from "../../../../../components/dashboard/employees/employee-form";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import { toast } from "sonner";
 
 interface EditEmployeePageProps {
   params: {
@@ -22,14 +22,19 @@ interface EditEmployeePageProps {
 export default async function EditEmployeePage({
   params,
 }: EditEmployeePageProps) {
-  const router = useRouter();
-  const employee = await getEmployee(params.id);
+  const { id } = await params;
+  const [employee, departments, positions] = await Promise.all([
+    getEmployee(id),
+    getDepartments(),
+    getPositions(),
+  ]);
 
   if (!employee) {
     notFound();
   }
 
-  async function handleUpdateEmployee(data: UpdateEmployeeData) {
+  async function handleUpdateEmployee(data: NewEmployeeData) {
+    "use server";
     try {
       const result = await updateEmployee({
         ...data,
@@ -37,14 +42,13 @@ export default async function EditEmployeePage({
       });
 
       if (result.success) {
-        toast.success("Employee updated successfully");
-        router.push(`/dashboard/employees/${employee!.id}`);
+        return {};
       } else {
-        toast.error(result.error || "Failed to update employee");
+        return { error: result.error || "Failed to update employee" };
       }
     } catch (error) {
-      toast.error("An unexpected error occurred");
       console.error("Error updating employee:", error);
+      return { error: "An unexpected error occurred" };
     }
   }
 
@@ -72,7 +76,10 @@ export default async function EditEmployeePage({
 
       <EmployeeForm
         initialData={employee}
-        onSubmit={(data) => handleUpdateEmployee({ ...data, id: employee.id })}
+        departments={departments}
+        positions={positions}
+        onSubmit={handleUpdateEmployee}
+        isEditing={true}
       />
     </div>
   );

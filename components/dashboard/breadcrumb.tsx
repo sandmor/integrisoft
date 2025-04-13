@@ -1,6 +1,3 @@
-"use client";
-
-import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   Breadcrumb,
@@ -12,10 +9,39 @@ import {
 } from "@/components/ui/breadcrumb";
 import { dashboardModules } from "@/lib/dashboard-config";
 import React from "react";
+import { db } from "@/lib/db";
+import { employees, users } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 
-export function DashboardBreadcrumb() {
-  const pathname = usePathname();
+// Helper function to get entity names by ID
+async function getEntityNameById(
+  type: string,
+  id: string
+): Promise<string | null> {
+  try {
+    if (type === "employees") {
+      // Get the employee and join with users to get name
+      const result = await db.query.employees.findFirst({
+        where: (employees, { eq, and }) =>
+          and(eq(employees.id, id), eq(employees.isDeleted, false)),
+        with: {
+          users: true,
+        },
+      });
 
+      if (result?.users) {
+        return `${result.users.name} ${result.users.lastName}`;
+      }
+    }
+    // Add other entity types as needed (clients, projects, etc.)
+    return null;
+  } catch (error) {
+    console.error(`Error fetching ${type} name:`, error);
+    return null;
+  }
+}
+
+export async function DashboardBreadcrumb({ pathname }: { pathname: string }) {
   // Skip for the main dashboard page
   if (pathname === "/dashboard") {
     return null;
@@ -24,7 +50,7 @@ export function DashboardBreadcrumb() {
   const segments = pathname.split("/").filter(Boolean);
 
   // Build breadcrumb items based on current path
-  const breadcrumbItems = segments.map((segment, index) => {
+  const breadcrumbItemsPromises = segments.map(async (segment, index) => {
     // Build the current path up to this segment
     const path = `/${segments.slice(0, index + 1).join("/")}`;
 
@@ -59,8 +85,20 @@ export function DashboardBreadcrumb() {
       displayName = "Edit";
     }
     // Handle UUIDs or IDs (most likely detail pages)
-    else if (segment.match(/^[0-9a-f-]{10,}$/)) {
-      displayName = "Details";
+    else if (segment.match(/^[A-Za-z0-9]{20,}$/)) {
+      // Try to get the entity name for this ID
+      const entityType = segments[index - 1]; // The previous segment should be the entity type (e.g., employees)
+
+      if (entityType) {
+        const entityName = await getEntityNameById(entityType, segment);
+        if (entityName) {
+          displayName = entityName;
+        } else {
+          displayName = "Details";
+        }
+      } else {
+        displayName = "Details";
+      }
     }
 
     return {
@@ -69,6 +107,8 @@ export function DashboardBreadcrumb() {
       isActive: index === segments.length - 1,
     };
   });
+
+  const breadcrumbItems = await Promise.all(breadcrumbItemsPromises);
 
   return (
     <Breadcrumb>

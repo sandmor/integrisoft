@@ -1,29 +1,36 @@
-"use client";
-
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { createEmployee, type NewEmployeeData } from "@/lib/actions/employees";
-import { EmployeeForm } from "../../../../components/dashboard/employees/employee-form";
+import {
+  createEmployee,
+  getDepartments,
+  getPositions,
+  type CreateEmployeeData,
+} from "@/lib/actions/employees";
+import { EmployeeForm } from "@/components/dashboard/employees/employee-form";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import { toast } from "sonner";
 
-export default function NewEmployeePage() {
-  const router = useRouter();
+export default async function NewEmployeePage() {
+  // Fetch data server-side
+  const [departments, positions] = await Promise.all([
+    getDepartments(),
+    getPositions(),
+  ]);
 
-  async function handleCreateEmployee(data: NewEmployeeData) {
+  async function handleCreateEmployee(data: any) {
+    "use server";
+
+    const employeeData: CreateEmployeeData = data as CreateEmployeeData;
     try {
-      const result = await createEmployee(data);
+      const result = await createEmployee(employeeData);
 
       if (result.success) {
-        toast.success("Employee created successfully");
-        router.push("/dashboard/employees");
+        return {};
       } else {
-        toast.error(result.error || "Failed to create employee");
+        return { error: result.error || "Failed to create employee" };
       }
     } catch (error) {
-      toast.error("An unexpected error occurred");
       console.error("Error creating employee:", error);
+      return { error: "An unexpected error occurred" };
     }
   }
 
@@ -43,11 +50,17 @@ export default function NewEmployeePage() {
       <div>
         <h2 className="text-2xl font-bold tracking-tight">Add New Employee</h2>
         <p className="text-muted-foreground">
-          Fill out the form below to create a new employee record.
+          Fill out the form below to create a new employee record with user
+          account access.
         </p>
       </div>
 
-      <EmployeeForm onSubmit={handleCreateEmployee} />
+      <EmployeeForm
+        departments={departments}
+        positions={positions}
+        onSubmit={handleCreateEmployee}
+        isEditing={false}
+      />
     </div>
   );
 }

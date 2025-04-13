@@ -1,12 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { format } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   Card,
   CardContent,
@@ -15,10 +24,25 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Employee } from "@/lib/actions/employees";
+import {
+  Employee,
+  CreateEmployeeData,
+  NewEmployeeData,
+  Department,
+  Position,
+} from "@/lib/actions/employees";
+import { toast } from "sonner";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+import { Combobox, ComboboxOption } from "@/components/ui/combobox";
 
-// Define validation schema for employee form
-const employeeFormSchema = z.object({
+// Base validation schema for employee form (without password validation)
+const baseEmployeeSchema = z.object({
   name: z.string().min(2, {
     message: "First name must be at least 2 characters.",
   }),
@@ -28,10 +52,10 @@ const employeeFormSchema = z.object({
   email: z.string().email({
     message: "Please enter a valid email address.",
   }),
-  department: z.string().optional(),
-  position: z.string().optional(),
-  hireDate: z.string().min(1, {
-    message: "Hire date is required.",
+  departmentId: z.string().optional(),
+  positionId: z.string().optional(),
+  hireDate: z.date({
+    required_error: "Hire date is required.",
   }),
   salary: z.string().optional(),
   contactEmail: z
@@ -42,63 +66,302 @@ const employeeFormSchema = z.object({
     .optional()
     .or(z.literal("")),
   contactPhone: z.string().optional(),
+  role: z.enum(["admin", "manager", "employee"]),
+  password: z.string().optional(),
+  confirmPassword: z.string().optional(),
 });
 
-type EmployeeFormValues = z.infer<typeof employeeFormSchema>;
+// Schema for editing - optional password with validation
+const editEmployeeSchema = baseEmployeeSchema.refine(
+  (data) => {
+    // If one password field is filled, both must be filled and must match
+    if (data.password || data.confirmPassword) {
+      if (!data.password || !data.confirmPassword) {
+        return false;
+      }
+      if (data.password !== data.confirmPassword) {
+        return false;
+      }
+      if (data.password.length < 8) {
+        return false;
+      }
+    }
+    return true;
+  },
+  {
+    message: "Passwords don't match or don't meet requirements",
+    path: ["confirmPassword"],
+  }
+);
 
-interface EmployeeFormProps {
+// Schema for new employees - required password
+const newEmployeeSchema = z
+  .object({
+    name: z.string().min(2, {
+      message: "First name must be at least 2 characters.",
+    }),
+    lastName: z.string().min(2, {
+      message: "Last name must be at least 2 characters.",
+    }),
+    email: z.string().email({
+      message: "Please enter a valid email address.",
+    }),
+    departmentId: z.string().optional(),
+    positionId: z.string().optional(),
+    hireDate: z.date({
+      required_error: "Hire date is required.",
+    }),
+    salary: z.string().optional(),
+    contactEmail: z
+      .string()
+      .email({
+        message: "Please enter a valid email address.",
+      })
+      .optional()
+      .or(z.literal("")),
+    contactPhone: z.string().optional(),
+    role: z.enum(["admin", "manager", "employee"]),
+    password: z.string().min(8, {
+      message: "Password must be at least 8 characters.",
+    }),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
+
+// Create our own type based on the schema
+type EmployeeFormValues = z.infer<typeof baseEmployeeSchema>;
+type NewEmployeeFormValues = z.infer<typeof newEmployeeSchema>;
+
+interface UnifiedEmployeeFormProps {
   initialData?: Employee;
-  onSubmit: (data: EmployeeFormValues) => Promise<void>;
+  departments: Department[];
+  positions: Position[];
+  onSubmit: (
+    data: CreateEmployeeData | NewEmployeeData
+  ) => Promise<{ error?: string } | void>;
   isSubmitting?: boolean;
+  isEditing?: boolean;
+}
+
+// Helper to convert departments to combobox options
+function departmentsToOptions(departments: Department[]): ComboboxOption[] {
+  return departments.map((dep) => ({
+    value: dep.id,
+    label: dep.name,
+  }));
+}
+
+// Helper to convert positions to combobox options
+function positionsToOptions(positions: Position[]): ComboboxOption[] {
+  return positions.map((pos) => ({
+    value: pos.id,
+    label: pos.title,
+  }));
+}
+
+// Filter positions by department
+function getPositionsForDepartment(
+  positions: Position[],
+  departmentId?: string
+): Position[] {
+  if (!departmentId) return positions;
+  return positions.filter((position) => position.departmentId === departmentId);
 }
 
 export function EmployeeForm({
   initialData,
+  departments,
+  positions,
   onSubmit,
   isSubmitting = false,
-}: EmployeeFormProps) {
+  isEditing = false,
+}: UnifiedEmployeeFormProps) {
+  console.log("EmployeeForm initialData:", initialData);
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(isSubmitting);
+  const [departmentOptions, setDepartmentOptions] = useState<ComboboxOption[]>(
+    []
+  );
+  const [positionOptions, setPositionOptions] = useState<ComboboxOption[]>([]);
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState<
+    string | undefined
+  >(undefined);
+  const [initialDepartmentId, setInitialDepartmentId] = useState<
+    string | undefined
+  >(undefined);
+  const [initialPositionId, setInitialPositionId] = useState<
+    string | undefined
+  >(undefined);
+  const [filteredPositions, setFilteredPositions] =
+    useState<Position[]>(positions);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // Map department name to ID for initial data
+  useEffect(() => {
+    console.log("Departments:", departments);
+    setDepartmentOptions(departmentsToOptions(departments));
+
+    // Find department ID for initial department name
+    let departmentId: string | undefined;
+    if (initialData?.department) {
+      const foundDepartment = departments.find(
+        (d) => d.name === initialData.department
+      );
+      departmentId = foundDepartment?.id;
+
+      if (departmentId) {
+        setSelectedDepartmentId(departmentId);
+        setInitialDepartmentId(departmentId);
+      }
+    }
+
+    // Find position ID for initial position title
+    let positionId: string | undefined;
+    if (initialData?.position) {
+      const foundPosition = positions.find(
+        (p) => p.title === initialData.position
+      );
+      positionId = foundPosition?.id;
+      setInitialPositionId(positionId);
+    }
+
+    // Filter positions by department if a department is selected
+    if (departmentId) {
+      const departmentPositions = getPositionsForDepartment(
+        positions,
+        departmentId
+      );
+      setFilteredPositions(departmentPositions);
+      setPositionOptions(positionsToOptions(departmentPositions));
+    } else {
+      setFilteredPositions(positions);
+      setPositionOptions(positionsToOptions(positions));
+    }
+
+    setIsInitialized(true);
+  }, [departments, positions, initialData]);
 
   // Set default values based on provided data or empty form
-  const defaultValues: Partial<EmployeeFormValues> = initialData
-    ? {
-        name: initialData.name,
-        lastName: initialData.lastName,
-        email: initialData.email,
-        department: initialData.department || undefined,
-        position: initialData.position || undefined,
-        hireDate: initialData.hireDate
-          ? new Date(initialData.hireDate).toISOString().split("T")[0]
-          : "",
-        salary: initialData.salary?.toString() || "",
-        contactEmail: initialData.contactEmail || "",
-        contactPhone: initialData.contactPhone || "",
-      }
-    : {
-        name: "",
-        lastName: "",
-        email: "",
-        department: "",
-        position: "",
-        hireDate: new Date().toISOString().split("T")[0],
-        salary: "",
-        contactEmail: "",
-        contactPhone: "",
-      };
+  const defaultValues: Partial<EmployeeFormValues> = {
+    name: initialData?.name || "",
+    lastName: initialData?.lastName || "",
+    email: initialData?.email || "",
+    departmentId: initialDepartmentId || "",
+    positionId: initialPositionId || "",
+    hireDate: initialData?.hireDate
+      ? new Date(initialData.hireDate)
+      : new Date(),
+    salary: initialData?.salary?.toString() || "",
+    contactEmail: initialData?.contactEmail || "",
+    contactPhone: initialData?.contactPhone || "",
+    role: "employee",
+    password: "",
+    confirmPassword: "",
+  };
 
-  const form = useForm<EmployeeFormValues>({
-    resolver: zodResolver(employeeFormSchema),
+  // Use the appropriate schema based on whether we're creating or editing
+  const schema = isEditing ? editEmployeeSchema : newEmployeeSchema;
+
+  const form = useForm<EmployeeFormValues | NewEmployeeFormValues>({
+    resolver: zodResolver(schema),
     defaultValues,
+    mode: "onBlur",
   });
 
-  async function handleSubmit(data: EmployeeFormValues) {
+  // Set form values after initialization
+  useEffect(() => {
+    if (isInitialized) {
+      if (initialDepartmentId) {
+        form.setValue("departmentId", initialDepartmentId);
+      }
+
+      if (initialPositionId) {
+        form.setValue("positionId", initialPositionId);
+      }
+
+      // For existing employees, set the role if available
+      if (isEditing && initialData) {
+        const existingRole =
+          initialData.role === "admin" ||
+          initialData.role === "manager" ||
+          initialData.role === "employee"
+            ? initialData.role
+            : "employee";
+        form.setValue("role", existingRole);
+      }
+    }
+  }, [
+    isInitialized,
+    initialDepartmentId,
+    initialPositionId,
+    form,
+    isEditing,
+    initialData,
+  ]);
+
+  // Update position options when department changes
+  const handleDepartmentChange = (departmentId: string) => {
+    setSelectedDepartmentId(departmentId);
+    const departmentPositions = getPositionsForDepartment(
+      positions,
+      departmentId
+    );
+    setFilteredPositions(departmentPositions);
+    setPositionOptions(positionsToOptions(departmentPositions));
+    form.setValue("positionId", ""); // Reset position when department changes
+  };
+
+  async function handleSubmit(
+    data: EmployeeFormValues | NewEmployeeFormValues
+  ) {
     try {
       setIsSaving(true);
-      await onSubmit(data);
-      router.refresh();
+
+      // Find department and position names from IDs
+      const selectedDepartment = departments.find(
+        (d) => d.id === data.departmentId
+      );
+      const selectedPosition = positions.find((p) => p.id === data.positionId);
+
+      // Convert form data to expected format
+      const employeeData: CreateEmployeeData = {
+        name: data.name,
+        lastName: data.lastName,
+        email: data.email,
+        department: selectedDepartment?.name,
+        position: selectedPosition?.title,
+        hireDate: data.hireDate,
+        salary: data.salary,
+        contactEmail: data.contactEmail || undefined,
+        contactPhone: data.contactPhone || undefined,
+        password: data.password || "", // Empty string will be handled by server
+        role: data.role,
+      };
+
+      const result = await onSubmit(employeeData);
+
+      // Check if there's an error returned from the server action
+      if (result && "error" in result) {
+        toast.error(result.error);
+        return;
+      }
+
+      toast.success(
+        isEditing
+          ? "Employee updated successfully!"
+          : "Employee created successfully!"
+      );
+      router.push("/dashboard/employees");
     } catch (error) {
       console.error("Error submitting form:", error);
+      toast.error(
+        `An error occurred while ${
+          isEditing ? "updating" : "creating"
+        } the employee data. Please try again.`
+      );
     } finally {
       setIsSaving(false);
     }
@@ -214,33 +477,43 @@ export function EmployeeForm({
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label htmlFor="department" className="text-sm font-medium">
+              <label htmlFor="departmentId" className="text-sm font-medium">
                 Department
               </label>
-              <Input
-                id="department"
-                placeholder="Department"
-                {...form.register("department")}
+              <Combobox
+                options={departmentOptions}
+                value={form.watch("departmentId") || ""}
+                onValueChange={(value) => {
+                  form.setValue("departmentId", value);
+                  handleDepartmentChange(value);
+                }}
+                placeholder="Select Department"
+                emptyMessage="No departments found."
               />
-              {form.formState.errors.department && (
+              {form.formState.errors.departmentId && (
                 <p className="text-sm text-red-500">
-                  {form.formState.errors.department.message}
+                  {form.formState.errors.departmentId.message}
                 </p>
               )}
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="position" className="text-sm font-medium">
+              <label htmlFor="positionId" className="text-sm font-medium">
                 Position
               </label>
-              <Input
-                id="position"
-                placeholder="Position"
-                {...form.register("position")}
+              <Combobox
+                options={positionOptions}
+                value={form.watch("positionId") || ""}
+                onValueChange={(value) => {
+                  form.setValue("positionId", value);
+                }}
+                placeholder="Select Position"
+                emptyMessage="No positions found."
+                disabled={!form.watch("departmentId")}
               />
-              {form.formState.errors.position && (
+              {form.formState.errors.positionId && (
                 <p className="text-sm text-red-500">
-                  {form.formState.errors.position.message}
+                  {form.formState.errors.positionId.message}
                 </p>
               )}
             </div>
@@ -251,7 +524,37 @@ export function EmployeeForm({
               <label htmlFor="hireDate" className="text-sm font-medium">
                 Hire Date
               </label>
-              <Input id="hireDate" type="date" {...form.register("hireDate")} />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !form.watch("hireDate") && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {form.watch("hireDate")
+                      ? format(form.watch("hireDate"), "PPP")
+                      : "Pick a date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={form.watch("hireDate")}
+                    onSelect={(date) => {
+                      if (date) {
+                        form.setValue("hireDate", date);
+                      }
+                    }}
+                    disabled={(date) =>
+                      date > new Date() || date < new Date("1900-01-01")
+                    }
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
               {form.formState.errors.hireDate && (
                 <p className="text-sm text-red-500">
                   {form.formState.errors.hireDate.message}
@@ -281,15 +584,106 @@ export function EmployeeForm({
         </CardContent>
       </Card>
 
+      {/* Account Details Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Account Information</CardTitle>
+          <CardDescription>
+            {isEditing
+              ? "Update account credentials for the employee (leave password blank to keep unchanged)."
+              : "Create account credentials for the employee."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label htmlFor="password" className="text-sm font-medium">
+                {isEditing ? "New Password (Optional)" : "Password"}
+              </label>
+              <Input
+                id="password"
+                type="password"
+                placeholder={
+                  isEditing ? "Enter new password" : "Create a password"
+                }
+                {...form.register("password")}
+              />
+              {form.formState.errors.password && (
+                <p className="text-sm text-red-500">
+                  {form.formState.errors.password.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="confirmPassword" className="text-sm font-medium">
+                {isEditing ? "Confirm New Password" : "Confirm Password"}
+              </label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                placeholder={
+                  isEditing ? "Confirm new password" : "Confirm password"
+                }
+                {...form.register("confirmPassword")}
+              />
+              {form.formState.errors.confirmPassword && (
+                <p className="text-sm text-red-500">
+                  {form.formState.errors.confirmPassword.message}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="role" className="text-sm font-medium">
+              User Role
+            </label>
+            <Select
+              defaultValue={form.getValues("role")}
+              onValueChange={(value) =>
+                form.setValue("role", value as "admin" | "manager" | "employee")
+              }
+            >
+              <SelectTrigger id="role" className="w-full">
+                <SelectValue placeholder="Select a role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="admin">Administrator</SelectItem>
+                <SelectItem value="manager">Manager</SelectItem>
+                <SelectItem value="employee">Employee</SelectItem>
+              </SelectContent>
+            </Select>
+            {form.formState.errors.role && (
+              <p className="text-sm text-red-500">
+                {form.formState.errors.role.message}
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Form Actions */}
       <div className="flex justify-end gap-4">
         <Button type="button" variant="outline" onClick={() => router.back()}>
           Cancel
         </Button>
         <Button type="submit" disabled={isSaving}>
-          {isSaving ? "Saving..." : "Save Employee"}
+          {isSaving
+            ? isEditing
+              ? "Saving..."
+              : "Creating..."
+            : isEditing
+            ? "Save Employee"
+            : "Create Employee"}
         </Button>
       </div>
     </form>
   );
+}
+
+export function NewEmployeeForm(
+  props: Omit<UnifiedEmployeeFormProps, "isEditing">
+) {
+  return <EmployeeForm {...props} isEditing={false} />;
 }

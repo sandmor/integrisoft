@@ -35,6 +35,7 @@ export async function generateActivities(
         format: (data: any) =>
           `Updated project "${data.projectName}" status to ${data.status}`,
         needsProject: true,
+        needsStatus: true,
         priority: 1,
       },
       {
@@ -69,6 +70,7 @@ export async function generateActivities(
           `Assigned ${data.employeeName} to project "${data.projectName}" as ${data.role}`,
         needsProject: true,
         needsEmployee: true,
+        needsRole: true,
         priority: 2,
       },
       {
@@ -79,6 +81,7 @@ export async function generateActivities(
         format: (data: any) =>
           `Updated budget for project "${data.projectName}" to $${data.budget}`,
         needsProject: true,
+        needsBudget: true,
         priority: 2,
         tags: ["budget", "finance"],
       },
@@ -90,6 +93,7 @@ export async function generateActivities(
         format: (data: any) =>
           `Extended deadline for project "${data.projectName}" to ${data.date}`,
         needsProject: true,
+        needsDate: true,
         priority: 2,
         tags: ["deadline"],
       },
@@ -148,6 +152,7 @@ export async function generateActivities(
         format: (data: any) =>
           `Updated task "${data.taskName}" status to "${data.status}"`,
         needsTask: true,
+        needsStatus: true,
         priority: 0,
       },
       {
@@ -199,6 +204,7 @@ export async function generateActivities(
         format: (data: any) =>
           `Scheduled meeting with "${data.clientName}" for ${data.date}`,
         needsClient: true,
+        needsDate: true,
         priority: 2,
         tags: ["meeting"],
       },
@@ -223,6 +229,7 @@ export async function generateActivities(
           `${data.employeeName} had a ${data.interactionType} with ${data.clientName}`,
         needsClient: true,
         needsEmployee: true,
+        needsInteractionType: true,
         priority: 1,
       },
     ],
@@ -245,6 +252,7 @@ export async function generateActivities(
         format: (data: any) =>
           `Released version ${data.version} of product "${data.productName}"`,
         needsProduct: true,
+        needsVersion: true,
         priority: 3,
         tags: ["release", "version"],
       },
@@ -291,6 +299,7 @@ export async function generateActivities(
         format: (data: any) =>
           `Onboarded new employee ${data.employeeName} to ${data.department} department`,
         needsEmployee: true,
+        needsDepartment: true,
         priority: 2,
         tags: ["onboarding"],
       },
@@ -302,6 +311,7 @@ export async function generateActivities(
         format: (data: any) =>
           `${data.employeeName} promoted to ${data.position}`,
         needsEmployee: true,
+        needsPosition: true,
         priority: 2,
         tags: ["promotion"],
       },
@@ -313,6 +323,7 @@ export async function generateActivities(
         format: (data: any) =>
           `Added ${data.skill} skill for ${data.employeeName}`,
         needsEmployee: true,
+        needsSkill: true,
         priority: 1,
       },
       {
@@ -323,6 +334,7 @@ export async function generateActivities(
         format: (data: any) =>
           `${data.employeeName} completed training in ${data.subject}`,
         needsEmployee: true,
+        needsSubject: true,
         priority: 1,
         tags: ["training"],
       },
@@ -334,6 +346,7 @@ export async function generateActivities(
         format: (data: any) =>
           `${data.employeeName} transferred to ${data.department} department`,
         needsEmployee: true,
+        needsDepartment: true,
         priority: 2,
       },
     ],
@@ -345,6 +358,8 @@ export async function generateActivities(
         color: "#22c55e", // green-500
         format: (data: any) =>
           `Created budget of $${data.amount} for ${data.entity}`,
+        needsAmount: true,
+        needsEntity: true,
         priority: 2,
         tags: ["budget"],
       },
@@ -355,6 +370,9 @@ export async function generateActivities(
         color: "#3b82f6", // blue-500
         format: (data: any) =>
           `Recorded ${data.type} transaction of $${data.amount} for ${data.purpose}`,
+        needsType: true,
+        needsAmount: true,
+        needsPurpose: true,
         priority: 1,
         tags: ["transaction"],
       },
@@ -366,6 +384,7 @@ export async function generateActivities(
         format: (data: any) =>
           `Sent invoice of $${data.amount} to client "${data.clientName}"`,
         needsClient: true,
+        needsAmount: true,
         priority: 2,
         tags: ["invoice"],
       },
@@ -377,6 +396,7 @@ export async function generateActivities(
         format: (data: any) =>
           `Received payment of $${data.amount} from client "${data.clientName}"`,
         needsClient: true,
+        needsAmount: true,
         priority: 2,
         tags: ["payment", "income"],
       },
@@ -387,6 +407,8 @@ export async function generateActivities(
         color: "#3b82f6", // blue-500
         format: (data: any) =>
           `Generated ${data.reportType} financial report for period ${data.period}`,
+        needsReportType: true,
+        needsPeriod: true,
         priority: 1,
         tags: ["report"],
       },
@@ -410,6 +432,7 @@ export async function generateActivities(
         format: (data: any) =>
           `Applied system update to version ${data.version}`,
         isSystem: true,
+        needsVersion: true,
         priority: 2,
         tags: ["update"],
       },
@@ -419,6 +442,7 @@ export async function generateActivities(
         icon: "UserPlus",
         color: "#22c55e", // green-500
         format: (data: any) => `Created user account for ${data.userName}`,
+        needsUserName: true,
         priority: 1,
       },
       {
@@ -428,6 +452,7 @@ export async function generateActivities(
         color: "#f59e0b", // amber-500
         format: (data: any) =>
           `Password reset requested for user ${data.userName}`,
+        needsUserName: true,
         priority: 2,
       },
       {
@@ -437,6 +462,8 @@ export async function generateActivities(
         color: "#3b82f6", // blue-500
         format: (data: any) =>
           `${data.userName} exported ${data.reportType} report`,
+        needsUserName: true,
+        needsReportType: true,
         priority: 0,
       },
     ],
@@ -631,7 +658,7 @@ export async function generateActivities(
 
       if (projectId) {
         // Add project status if needed
-        if (activityTemplate.action.includes("status")) {
+        if ("needsStatus" in activityTemplate && activityTemplate.needsStatus) {
           const statuses = [
             "planning",
             "active",
@@ -672,7 +699,10 @@ export async function generateActivities(
             taskId = task.id;
             activityData.taskName = task.title;
 
-            if (activityTemplate.action.includes("status")) {
+            if (
+              "needsStatus" in activityTemplate &&
+              activityTemplate.needsStatus
+            ) {
               const taskStatuses = ["todo", "in_progress", "review", "done"];
               activityData.status =
                 taskStatuses[Math.floor(Math.random() * taskStatuses.length)];
@@ -684,7 +714,7 @@ export async function generateActivities(
         }
 
         // Add budget if needed
-        if (activityTemplate.action.includes("budget")) {
+        if ("needsBudget" in activityTemplate && activityTemplate.needsBudget) {
           activityData.budget = (
             Math.round(Math.random() * 5000) + 5000
           ).toLocaleString();
@@ -704,7 +734,10 @@ export async function generateActivities(
       activityData.clientName =
         cache.clients.get(clientId)?.name || "Unknown Client";
 
-      if (activityTemplate.action.includes("interaction")) {
+      if (
+        "needsInteractionType" in activityTemplate &&
+        activityTemplate.needsInteractionType
+      ) {
         const interactionTypes = [
           "call",
           "meeting",
@@ -729,7 +762,7 @@ export async function generateActivities(
       activityData.productName =
         cache.products.get(productId)?.name || "Unknown Product";
 
-      if (activityTemplate.action.includes("version")) {
+      if ("needsVersion" in activityTemplate && activityTemplate.needsVersion) {
         const productVersions = cache.products.get(productId)?.versions || [];
         if (productVersions.length > 0) {
           const version =
@@ -757,9 +790,10 @@ export async function generateActivities(
       const employeeData = cache.employees.get(employeeId);
       activityData.employeeName = employeeData?.name || "Unknown Employee";
 
+      // Set position data if needed
       if (
-        activityTemplate.action.includes("promoted") ||
-        activityTemplate.action.includes("role")
+        "needsPosition" in activityTemplate &&
+        activityTemplate.needsPosition
       ) {
         const positions = [
           "Developer",
@@ -775,12 +809,17 @@ export async function generateActivities(
           positions[Math.floor(Math.random() * positions.length)];
       }
 
-      if (activityTemplate.action.includes("department")) {
+      // Set department data if needed
+      if (
+        "needsDepartment" in activityTemplate &&
+        activityTemplate.needsDepartment
+      ) {
         activityData.department =
           employeeData?.department || "Unknown Department";
       }
 
-      if (activityTemplate.action.includes("skill")) {
+      // Set skill data if needed
+      if ("needsSkill" in activityTemplate && activityTemplate.needsSkill) {
         const skills = [
           "JavaScript",
           "React",
@@ -796,7 +835,8 @@ export async function generateActivities(
         activityData.skill = skills[Math.floor(Math.random() * skills.length)];
       }
 
-      if (activityTemplate.action.includes("training")) {
+      // Set subject data if needed
+      if ("needsSubject" in activityTemplate && activityTemplate.needsSubject) {
         const subjects = [
           "Cloud Computing",
           "Agile Development",
@@ -810,12 +850,22 @@ export async function generateActivities(
       }
     }
 
+    // Set role data if needed
+    if ("needsRole" in activityTemplate && activityTemplate.needsRole) {
+      const roles = [
+        "Developer",
+        "QA Tester",
+        "Designer",
+        "Technical Lead",
+        "Business Analyst",
+        "Product Owner",
+        "Project Manager",
+      ];
+      activityData.role = roles[Math.floor(Math.random() * roles.length)];
+    }
+
     // Add date if needed
-    if (
-      activityTemplate.action.includes("deadline") ||
-      activityTemplate.action.includes("scheduled") ||
-      activityTemplate.action.includes("meeting")
-    ) {
+    if ("needsDate" in activityTemplate && activityTemplate.needsDate) {
       const futureDate = new Date();
       futureDate.setDate(
         futureDate.getDate() + Math.floor(Math.random() * 30) + 1
@@ -825,15 +875,21 @@ export async function generateActivities(
 
     // Add finance specific data
     if (selectedCategory === "finance") {
-      // Transaction amount
-      activityData.amount = (
-        Math.round(Math.random() * 10000) + 1000
-      ).toLocaleString();
+      // Transaction amount if needed
+      if ("needsAmount" in activityTemplate && activityTemplate.needsAmount) {
+        activityData.amount = (
+          Math.round(Math.random() * 10000) + 1000
+        ).toLocaleString();
+      }
 
-      if (activityTemplate.action.includes("Transaction")) {
+      // Transaction type if needed
+      if ("needsType" in activityTemplate && activityTemplate.needsType) {
         const types = ["income", "expense", "transfer"];
         activityData.type = types[Math.floor(Math.random() * types.length)];
+      }
 
+      // Transaction purpose if needed
+      if ("needsPurpose" in activityTemplate && activityTemplate.needsPurpose) {
         const purposes = [
           "Software licenses",
           "Hardware purchase",
@@ -846,7 +902,8 @@ export async function generateActivities(
           purposes[Math.floor(Math.random() * purposes.length)];
       }
 
-      if (activityTemplate.action.includes("Budget")) {
+      // Entity for budgets if needed
+      if ("needsEntity" in activityTemplate && activityTemplate.needsEntity) {
         const entities = [
           "Q2 Operations",
           "Marketing Campaign",
@@ -858,7 +915,11 @@ export async function generateActivities(
           entities[Math.floor(Math.random() * entities.length)];
       }
 
-      if (activityTemplate.action.includes("report")) {
+      // Report type if needed
+      if (
+        "needsReportType" in activityTemplate &&
+        activityTemplate.needsReportType
+      ) {
         const reportTypes = [
           "Monthly",
           "Quarterly",
@@ -868,7 +929,10 @@ export async function generateActivities(
         ];
         activityData.reportType =
           reportTypes[Math.floor(Math.random() * reportTypes.length)];
+      }
 
+      // Report period if needed
+      if ("needsPeriod" in activityTemplate && activityTemplate.needsPeriod) {
         const periods = [
           "Q1 2025",
           "Q2 2025",
@@ -884,15 +948,17 @@ export async function generateActivities(
 
     // Add system specific data
     if (selectedCategory === "system") {
-      if (activityTemplate.action.includes("version")) {
+      // Version for system updates if needed
+      if ("needsVersion" in activityTemplate && activityTemplate.needsVersion) {
         activityData.version = `${
           Math.floor(Math.random() * 3) + 1
         }.${Math.floor(Math.random() * 10)}.${Math.floor(Math.random() * 10)}`;
       }
 
+      // Username if needed
       if (
-        activityTemplate.action.includes("User") ||
-        activityTemplate.action.includes("Password")
+        "needsUserName" in activityTemplate &&
+        activityTemplate.needsUserName
       ) {
         // Use a cached user
         if (cache.users.size > 0) {
@@ -906,7 +972,11 @@ export async function generateActivities(
         }
       }
 
-      if (activityTemplate.action.includes("Report")) {
+      // Report type if needed
+      if (
+        "needsReportType" in activityTemplate &&
+        activityTemplate.needsReportType
+      ) {
         const reportTypes = [
           "Monthly",
           "Quarterly",
@@ -917,17 +987,6 @@ export async function generateActivities(
         ];
         activityData.reportType =
           reportTypes[Math.floor(Math.random() * reportTypes.length)];
-
-        // Use a cached user
-        if (cache.users.size > 0) {
-          userId = Array.from(cache.users.keys())[
-            Math.floor(Math.random() * cache.users.size)
-          ];
-          activityData.userName =
-            cache.users.get(userId)?.name || "Unknown User";
-        } else {
-          activityData.userName = `user${Math.floor(Math.random() * 100) + 1}`;
-        }
       }
     }
 
@@ -961,7 +1020,6 @@ export async function generateActivities(
       isSystem: isSystem,
       timestamp: timestamp,
       details: activityData,
-      // New enhanced fields for UI display
       icon: activityTemplate.icon,
       color: activityTemplate.color,
       priority: activityTemplate.priority || 0,

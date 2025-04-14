@@ -1,7 +1,22 @@
+"use client";
+
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { client } from "@/lib/auth-client";
 
 export default function Home() {
+  const router = useRouter();
+
+  useEffect(() => {
+    client.getSession().then((session) => {
+      if (session.data) {
+        router.push("/dashboard");
+      }
+    });
+  }, [router]);
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-24">
       <div className="flex flex-col items-center justify-center gap-6 text-center">

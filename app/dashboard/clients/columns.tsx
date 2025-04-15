@@ -4,7 +4,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ArrowUpDown, Eye } from "lucide-react";
+import { Eye } from "lucide-react";
 
 type AccountManagerInfo = {
   id: string | null;
@@ -23,21 +23,13 @@ export type ClientTableItem = {
 export const columns: ColumnDef<ClientTableItem>[] = [
   {
     accessorKey: "name",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Client Name
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
+    header: "Client Name",
+    enableSorting: true,
   },
   {
     accessorKey: "industry",
     header: "Industry",
+    enableSorting: true,
     cell: ({ row }) => {
       const industry = row.getValue("industry") as string | null;
       return <span>{industry || "N/A"}</span>;
@@ -46,6 +38,7 @@ export const columns: ColumnDef<ClientTableItem>[] = [
   {
     accessorKey: "website",
     header: "Website",
+    enableSorting: false,
     cell: ({ row }) => {
       const website = row.getValue("website") as string | null;
       return website ? (
@@ -65,6 +58,7 @@ export const columns: ColumnDef<ClientTableItem>[] = [
   {
     accessorKey: "accountManager",
     header: "Account Manager",
+    enableSorting: false,
     cell: ({ row }) => {
       const accountManager = row.getValue(
         "accountManager"
@@ -74,17 +68,8 @@ export const columns: ColumnDef<ClientTableItem>[] = [
   },
   {
     accessorKey: "projectCount",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Projects
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
+    header: "Projects",
+    enableSorting: true,
     cell: ({ row }) => {
       const count = row.getValue("projectCount") as number;
       return <Badge variant={count > 0 ? "default" : "outline"}>{count}</Badge>;
@@ -92,6 +77,8 @@ export const columns: ColumnDef<ClientTableItem>[] = [
   },
   {
     id: "actions",
+    header: "Actions",
+    enableSorting: false,
     cell: ({ row }) => {
       const client = row.original;
       return (

@@ -11,28 +11,34 @@ export const columns: ColumnDef<Employee>[] = [
   {
     accessorKey: "name",
     header: "First Name",
+    enableSorting: true,
   },
   {
     accessorKey: "lastName",
     header: "Last Name",
+    enableSorting: true,
   },
   {
     accessorKey: "email",
     header: "Email",
+    enableSorting: true,
   },
   {
     accessorKey: "department",
     header: "Department",
+    enableSorting: true,
     cell: ({ row }) => row.getValue("department") || "—",
   },
   {
     accessorKey: "position",
     header: "Position",
+    enableSorting: true,
     cell: ({ row }) => row.getValue("position") || "—",
   },
   {
     accessorKey: "hireDate",
     header: "Hire Date",
+    enableSorting: true,
     cell: ({ row }) => {
       const date = row.getValue("hireDate") as Date;
       return formatDate(date);
@@ -40,6 +46,8 @@ export const columns: ColumnDef<Employee>[] = [
   },
   {
     id: "actions",
+    header: "Actions",
+    enableSorting: false,
     cell: ({ row }) => {
       const employee = row.original;
 

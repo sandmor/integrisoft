@@ -179,7 +179,6 @@ export function EmployeeForm({
   isSubmitting = false,
   isEditing = false,
 }: UnifiedEmployeeFormProps) {
-  console.log("EmployeeForm initialData:", initialData);
   const router = useRouter();
   const [isSaving, setIsSaving] = useState(isSubmitting);
   const [departmentOptions, setDepartmentOptions] = useState<ComboboxOption[]>(
@@ -201,7 +200,6 @@ export function EmployeeForm({
 
   // Map department name to ID for initial data
   useEffect(() => {
-    console.log("Departments:", departments);
     setDepartmentOptions(departmentsToOptions(departments));
 
     // Find department ID for initial department name

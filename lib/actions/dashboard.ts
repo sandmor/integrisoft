@@ -308,6 +308,66 @@ export async function getRecentActivities(): Promise<ActivityItem[]> {
   }));
 }
 
+export async function getEntityNameById(
+  type: string,
+  id: string
+): Promise<{ id: string; name: string } | null> {
+  try {
+    if (type === "employees") {
+      // Get the employee and join with users to get name
+      const result = await db.query.employees.findFirst({
+        where: (employees, { eq, and }) =>
+          and(eq(employees.id, id), eq(employees.isDeleted, false)),
+        with: {
+          users: true,
+        },
+      });
+
+      if (result?.users) {
+        return {
+          id,
+          name: `${result.users.name} ${result.users.lastName}`,
+        };
+      }
+    }
+
+    // Add other entity types as needed (clients, projects, etc.)
+    // For example:
+    if (type === "clients") {
+      const result = await db.query.clients.findFirst({
+        where: (clients, { eq, and }) =>
+          and(eq(clients.id, id), eq(clients.isDeleted, false)),
+      });
+
+      if (result) {
+        return {
+          id,
+          name: result.name,
+        };
+      }
+    }
+
+    if (type === "projects") {
+      const result = await db.query.projects.findFirst({
+        where: (projects, { eq, and }) =>
+          and(eq(projects.id, id), eq(projects.isDeleted, false)),
+      });
+
+      if (result) {
+        return {
+          id,
+          name: result.name,
+        };
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error(`Error fetching ${type} name:`, error);
+    return null;
+  }
+}
+
 function mapTaskStatus(
   status: string | null
 ): "completed" | "in-progress" | "pending" {

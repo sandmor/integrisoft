@@ -1,7 +1,8 @@
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
-import { DashboardBreadcrumb } from "@/components/dashboard/breadcrumb";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
+import { DashboardBreadcrumb } from "@/components/dashboard/breadcrumb";
+import { getEntityNameById } from "@/lib/actions/dashboard";
 
 export default async function DashboardLayout({
   children,
@@ -22,6 +23,27 @@ export default async function DashboardLayout({
     headersList.get("x-invoke-path") ||
     "/dashboard";
 
+  // Extract entity ID from pathname for entity detail pages
+  let entityTitle = undefined;
+  if (pathname) {
+    const segments = pathname.split("/").filter(Boolean);
+    // Look for ID pattern in segments
+    for (let i = 1; i < segments.length; i++) {
+      const segment = segments[i];
+      if (segment.match(/^[A-Za-z0-9]{20,}$/)) {
+        const entityType = segments[i - 1];
+        if (entityType) {
+          // Try to fetch entity name on the server to pass to client
+          const entityInfo = await getEntityNameById(entityType, segment);
+          if (entityInfo) {
+            entityTitle = entityInfo;
+          }
+          break;
+        }
+      }
+    }
+  }
+
   return (
     <div className="flex min-h-screen">
       {/* Client-side interactive sidebar */}
@@ -40,9 +62,12 @@ export default async function DashboardLayout({
           </div>
         </header>
 
-        {/* Breadcrumb - directly include server component */}
+        {/* Breadcrumb - client component with server-provided data */}
         <div className="px-6 pt-4">
-          <DashboardBreadcrumb pathname={pathname} />
+          <DashboardBreadcrumb
+            initialPathname={pathname}
+            entityTitle={entityTitle}
+          />
         </div>
 
         {/* Page content */}

@@ -1,21 +1,16 @@
-"use client";
-
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { client } from "@/lib/auth-client";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
-export default function Home() {
-  const router = useRouter();
-
-  useEffect(() => {
-    client.getSession().then((session) => {
-      if (session.data) {
-        router.push("/dashboard");
-      }
-    });
-  }, [router]);
+export default async function Home() {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+  if (session?.session) {
+    redirect("/dashboard");
+  }
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-24">

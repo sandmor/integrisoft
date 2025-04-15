@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { redirect, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 export default function LoginPage() {
@@ -44,7 +44,8 @@ export default function LoginPage() {
               if (error) {
                 return { error: error.message ?? "An error occurred" };
               } else {
-                redirect("/dashboard");
+                router.push("/dashboard");
+                return {};
               }
             }}
           />

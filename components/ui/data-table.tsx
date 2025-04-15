@@ -25,6 +25,22 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TableLoadingSpinner } from "./spinner";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -138,28 +154,142 @@ export function DataTable<TData, TValue>({
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-end space-x-2 py-4">
-        <div className="text-sm text-muted-foreground">
+      <div className="flex items-center justify-end space-x-4 py-4">
+        <div className="text-sm text-muted-foreground mr-auto">
           {table.getFilteredSelectedRowModel().rows.length} of{" "}
           {table.getFilteredRowModel().rows.length} row(s) selected.
         </div>
-        <div className="space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage() || isLoading}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage() || isLoading}
-          >
-            Next
-          </Button>
+
+        <div className="flex items-center space-x-4">
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={() => table.previousPage()}
+                  tabIndex={0}
+                  className={
+                    !table.getCanPreviousPage() || isLoading
+                      ? "pointer-events-none opacity-50"
+                      : ""
+                  }
+                  aria-disabled={!table.getCanPreviousPage() || isLoading}
+                />
+              </PaginationItem>
+
+              {/* First page */}
+              <PaginationItem>
+                <PaginationLink
+                  onClick={() => table.setPageIndex(0)}
+                  isActive={table.getState().pagination.pageIndex === 0}
+                  tabIndex={0}
+                  className={isLoading ? "pointer-events-none opacity-50" : ""}
+                  aria-disabled={isLoading}
+                >
+                  1
+                </PaginationLink>
+              </PaginationItem>
+
+              {/* Show ellipsis if we're beyond page 2 */}
+              {table.getPageCount() > 2 &&
+                table.getState().pagination.pageIndex > 1 && (
+                  <PaginationItem>
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                )}
+
+              {/* Current page (if not first or last) */}
+              {table.getState().pagination.pageIndex > 0 &&
+                table.getState().pagination.pageIndex <
+                  table.getPageCount() - 1 && (
+                  <PaginationItem>
+                    <PaginationLink
+                      onClick={() =>
+                        table.setPageIndex(
+                          table.getState().pagination.pageIndex
+                        )
+                      }
+                      isActive={true}
+                      tabIndex={0}
+                      className={
+                        isLoading ? "pointer-events-none opacity-50" : ""
+                      }
+                      aria-disabled={isLoading}
+                    >
+                      {table.getState().pagination.pageIndex + 1}
+                    </PaginationLink>
+                  </PaginationItem>
+                )}
+
+              {/* Show ellipsis if there are more pages and we're not at the end */}
+              {table.getPageCount() > 2 &&
+                table.getState().pagination.pageIndex <
+                  table.getPageCount() - 2 && (
+                  <PaginationItem>
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                )}
+
+              {/* Last page (if more than 1 page) */}
+              {table.getPageCount() > 1 && (
+                <PaginationItem>
+                  <PaginationLink
+                    onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                    isActive={
+                      table.getState().pagination.pageIndex ===
+                      table.getPageCount() - 1
+                    }
+                    tabIndex={0}
+                    className={
+                      isLoading ? "pointer-events-none opacity-50" : ""
+                    }
+                    aria-disabled={isLoading}
+                  >
+                    {table.getPageCount()}
+                  </PaginationLink>
+                </PaginationItem>
+              )}
+
+              <PaginationItem>
+                <PaginationNext
+                  onClick={() => table.nextPage()}
+                  tabIndex={0}
+                  className={
+                    !table.getCanNextPage() || isLoading
+                      ? "pointer-events-none opacity-50"
+                      : ""
+                  }
+                  aria-disabled={!table.getCanNextPage() || isLoading}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+
+          <div className="flex items-center space-x-2">
+            <p className="text-sm text-muted-foreground whitespace-nowrap">
+              Rows per page
+            </p>
+            <Select
+              value={`${table.getState().pagination.pageSize}`}
+              onValueChange={(value) => table.setPageSize(Number(value))}
+              disabled={isLoading}
+            >
+              <SelectTrigger
+                className="h-8 w-[70px]"
+                aria-label="Rows per page"
+              >
+                <SelectValue
+                  placeholder={table.getState().pagination.pageSize}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {[10, 20, 30, 40, 50].map((pageSize) => (
+                  <SelectItem key={pageSize} value={`${pageSize}`}>
+                    {pageSize}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
     </div>

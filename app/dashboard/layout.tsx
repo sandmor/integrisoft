@@ -64,10 +64,7 @@ export default async function DashboardLayout({
 
         {/* Breadcrumb - client component with server-provided data */}
         <div className="px-6 pt-4">
-          <DashboardBreadcrumb
-            initialPathname={pathname}
-            entityTitle={entityTitle}
-          />
+          <DashboardBreadcrumb entityTitle={entityTitle} />
         </div>
 
         {/* Page content */}

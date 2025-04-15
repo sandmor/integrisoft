@@ -3,6 +3,71 @@ import { createId } from "@paralleldrive/cuid2";
 import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
+// Helper function to safely check property existence and value
+function safeCheck(obj: any, prop: string): boolean {
+  return prop in obj && Boolean(obj[prop]);
+}
+
+// Helper function to check if any of the properties in the list exist and are truthy
+function safeCheckAny(obj: any, props: string[]): boolean {
+  return props.some((prop) => safeCheck(obj, prop));
+}
+
+// Helper to ensure parent properties are set if their children are required
+function ensureParentPropertiesForTemplate(template: any): any {
+  const updatedTemplate = { ...template };
+
+  // If any property that requires a project is set, ensure needsProject is also set
+  if (
+    safeCheckAny(template, [
+      "needsStatus",
+      "needsMilestone",
+      "needsTask",
+      "needsBudget",
+    ]) &&
+    !template.needsProject
+  ) {
+    updatedTemplate.needsProject = true;
+  }
+
+  // If any property that requires a task is set, ensure needsTask is also set
+  if (
+    safeCheckAny(template, ["needsStatus"]) &&
+    !template.needsTask &&
+    !template.needsProject
+  ) {
+    updatedTemplate.needsTask = true;
+  }
+
+  // If any property that requires a product is set, ensure needsProduct is also set
+  if (safeCheckAny(template, ["needsVersion"]) && !template.needsProduct) {
+    updatedTemplate.needsProduct = true;
+  }
+
+  // If any property that requires an employee is set, ensure needsEmployee is also set
+  if (
+    safeCheckAny(template, [
+      "needsPosition",
+      "needsDepartment",
+      "needsSkill",
+      "needsSubject",
+    ]) &&
+    !template.needsEmployee
+  ) {
+    updatedTemplate.needsEmployee = true;
+  }
+
+  // If any property that requires a client is set, ensure needsClient is also set
+  if (
+    safeCheckAny(template, ["needsInteractionType"]) &&
+    !template.needsClient
+  ) {
+    updatedTemplate.needsClient = true;
+  }
+
+  return updatedTemplate;
+}
+
 // Generate activities (System Logs)
 export async function generateActivities(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
@@ -637,8 +702,12 @@ export async function generateActivities(
     // Select a random activity template from the selected category
     const activityTemplates =
       activityTypes[selectedCategory as keyof typeof activityTypes];
-    const activityTemplate =
+    const selectedTemplate =
       activityTemplates[Math.floor(Math.random() * activityTemplates.length)];
+
+    // Ensure all necessary parent properties are set based on child requirements
+    const activityTemplate =
+      ensureParentPropertiesForTemplate(selectedTemplate);
 
     // Prepare data for the activity based on the template's requirements
     const activityData: any = {};
@@ -646,8 +715,7 @@ export async function generateActivities(
 
     // Conditional entity selection based on template requirements
     if (
-      "needsProject" in activityTemplate &&
-      activityTemplate.needsProject &&
+      safeCheck(activityTemplate, "needsProject") &&
       cache.projects.size > 0
     ) {
       projectId = Array.from(cache.projects.keys())[
@@ -658,7 +726,7 @@ export async function generateActivities(
 
       if (projectId) {
         // Add project status if needed
-        if ("needsStatus" in activityTemplate && activityTemplate.needsStatus) {
+        if (safeCheck(activityTemplate, "needsStatus")) {
           const statuses = [
             "planning",
             "active",
@@ -671,10 +739,7 @@ export async function generateActivities(
         }
 
         // Add milestone if needed
-        if (
-          "needsMilestone" in activityTemplate &&
-          activityTemplate.needsMilestone
-        ) {
+        if (safeCheck(activityTemplate, "needsMilestone")) {
           const projectMilestones =
             cache.projects.get(projectId)?.milestones || [];
           if (projectMilestones.length > 0) {
@@ -691,7 +756,7 @@ export async function generateActivities(
         }
 
         // Add task if needed
-        if ("needsTask" in activityTemplate && activityTemplate.needsTask) {
+        if (safeCheck(activityTemplate, "needsTask")) {
           const projectTasks = cache.projects.get(projectId)?.tasks || [];
           if (projectTasks.length > 0) {
             const task =
@@ -699,10 +764,7 @@ export async function generateActivities(
             taskId = task.id;
             activityData.taskName = task.title;
 
-            if (
-              "needsStatus" in activityTemplate &&
-              activityTemplate.needsStatus
-            ) {
+            if (safeCheck(activityTemplate, "needsStatus")) {
               const taskStatuses = ["todo", "in_progress", "review", "done"];
               activityData.status =
                 taskStatuses[Math.floor(Math.random() * taskStatuses.length)];
@@ -714,7 +776,7 @@ export async function generateActivities(
         }
 
         // Add budget if needed
-        if ("needsBudget" in activityTemplate && activityTemplate.needsBudget) {
+        if (safeCheck(activityTemplate, "needsBudget")) {
           activityData.budget = (
             Math.round(Math.random() * 5000) + 5000
           ).toLocaleString();
@@ -723,21 +785,14 @@ export async function generateActivities(
     }
 
     // Add client data if needed
-    if (
-      "needsClient" in activityTemplate &&
-      activityTemplate.needsClient &&
-      cache.clients.size > 0
-    ) {
+    if (safeCheck(activityTemplate, "needsClient") && cache.clients.size > 0) {
       clientId = Array.from(cache.clients.keys())[
         Math.floor(Math.random() * cache.clients.size)
       ];
       activityData.clientName =
         cache.clients.get(clientId)?.name || "Unknown Client";
 
-      if (
-        "needsInteractionType" in activityTemplate &&
-        activityTemplate.needsInteractionType
-      ) {
+      if (safeCheck(activityTemplate, "needsInteractionType")) {
         const interactionTypes = [
           "call",
           "meeting",
@@ -752,8 +807,7 @@ export async function generateActivities(
 
     // Add product data if needed
     if (
-      "needsProduct" in activityTemplate &&
-      activityTemplate.needsProduct &&
+      safeCheck(activityTemplate, "needsProduct") &&
       cache.products.size > 0
     ) {
       productId = Array.from(cache.products.keys())[
@@ -762,7 +816,7 @@ export async function generateActivities(
       activityData.productName =
         cache.products.get(productId)?.name || "Unknown Product";
 
-      if ("needsVersion" in activityTemplate && activityTemplate.needsVersion) {
+      if (safeCheck(activityTemplate, "needsVersion")) {
         const productVersions = cache.products.get(productId)?.versions || [];
         if (productVersions.length > 0) {
           const version =
@@ -780,8 +834,7 @@ export async function generateActivities(
 
     // Add employee data if needed
     if (
-      "needsEmployee" in activityTemplate &&
-      activityTemplate.needsEmployee &&
+      safeCheck(activityTemplate, "needsEmployee") &&
       cache.employees.size > 0
     ) {
       employeeId = Array.from(cache.employees.keys())[
@@ -791,10 +844,7 @@ export async function generateActivities(
       activityData.employeeName = employeeData?.name || "Unknown Employee";
 
       // Set position data if needed
-      if (
-        "needsPosition" in activityTemplate &&
-        activityTemplate.needsPosition
-      ) {
+      if (safeCheck(activityTemplate, "needsPosition")) {
         const positions = [
           "Developer",
           "Senior Developer",
@@ -810,16 +860,13 @@ export async function generateActivities(
       }
 
       // Set department data if needed
-      if (
-        "needsDepartment" in activityTemplate &&
-        activityTemplate.needsDepartment
-      ) {
+      if (safeCheck(activityTemplate, "needsDepartment")) {
         activityData.department =
           employeeData?.department || "Unknown Department";
       }
 
       // Set skill data if needed
-      if ("needsSkill" in activityTemplate && activityTemplate.needsSkill) {
+      if (safeCheck(activityTemplate, "needsSkill")) {
         const skills = [
           "JavaScript",
           "React",
@@ -836,7 +883,7 @@ export async function generateActivities(
       }
 
       // Set subject data if needed
-      if ("needsSubject" in activityTemplate && activityTemplate.needsSubject) {
+      if (safeCheck(activityTemplate, "needsSubject")) {
         const subjects = [
           "Cloud Computing",
           "Agile Development",
@@ -851,7 +898,7 @@ export async function generateActivities(
     }
 
     // Set role data if needed
-    if ("needsRole" in activityTemplate && activityTemplate.needsRole) {
+    if (safeCheck(activityTemplate, "needsRole")) {
       const roles = [
         "Developer",
         "QA Tester",
@@ -865,7 +912,7 @@ export async function generateActivities(
     }
 
     // Add date if needed
-    if ("needsDate" in activityTemplate && activityTemplate.needsDate) {
+    if (safeCheck(activityTemplate, "needsDate")) {
       const futureDate = new Date();
       futureDate.setDate(
         futureDate.getDate() + Math.floor(Math.random() * 30) + 1
@@ -876,20 +923,20 @@ export async function generateActivities(
     // Add finance specific data
     if (selectedCategory === "finance") {
       // Transaction amount if needed
-      if ("needsAmount" in activityTemplate && activityTemplate.needsAmount) {
+      if (safeCheck(activityTemplate, "needsAmount")) {
         activityData.amount = (
           Math.round(Math.random() * 10000) + 1000
         ).toLocaleString();
       }
 
       // Transaction type if needed
-      if ("needsType" in activityTemplate && activityTemplate.needsType) {
+      if (safeCheck(activityTemplate, "needsType")) {
         const types = ["income", "expense", "transfer"];
         activityData.type = types[Math.floor(Math.random() * types.length)];
       }
 
       // Transaction purpose if needed
-      if ("needsPurpose" in activityTemplate && activityTemplate.needsPurpose) {
+      if (safeCheck(activityTemplate, "needsPurpose")) {
         const purposes = [
           "Software licenses",
           "Hardware purchase",
@@ -903,7 +950,7 @@ export async function generateActivities(
       }
 
       // Entity for budgets if needed
-      if ("needsEntity" in activityTemplate && activityTemplate.needsEntity) {
+      if (safeCheck(activityTemplate, "needsEntity")) {
         const entities = [
           "Q2 Operations",
           "Marketing Campaign",
@@ -916,10 +963,7 @@ export async function generateActivities(
       }
 
       // Report type if needed
-      if (
-        "needsReportType" in activityTemplate &&
-        activityTemplate.needsReportType
-      ) {
+      if (safeCheck(activityTemplate, "needsReportType")) {
         const reportTypes = [
           "Monthly",
           "Quarterly",
@@ -932,7 +976,7 @@ export async function generateActivities(
       }
 
       // Report period if needed
-      if ("needsPeriod" in activityTemplate && activityTemplate.needsPeriod) {
+      if (safeCheck(activityTemplate, "needsPeriod")) {
         const periods = [
           "Q1 2025",
           "Q2 2025",
@@ -949,17 +993,14 @@ export async function generateActivities(
     // Add system specific data
     if (selectedCategory === "system") {
       // Version for system updates if needed
-      if ("needsVersion" in activityTemplate && activityTemplate.needsVersion) {
+      if (safeCheck(activityTemplate, "needsVersion")) {
         activityData.version = `${
           Math.floor(Math.random() * 3) + 1
         }.${Math.floor(Math.random() * 10)}.${Math.floor(Math.random() * 10)}`;
       }
 
       // Username if needed
-      if (
-        "needsUserName" in activityTemplate &&
-        activityTemplate.needsUserName
-      ) {
+      if (safeCheck(activityTemplate, "needsUserName")) {
         // Use a cached user
         if (cache.users.size > 0) {
           userId = Array.from(cache.users.keys())[
@@ -973,10 +1014,7 @@ export async function generateActivities(
       }
 
       // Report type if needed
-      if (
-        "needsReportType" in activityTemplate &&
-        activityTemplate.needsReportType
-      ) {
+      if (safeCheck(activityTemplate, "needsReportType")) {
         const reportTypes = [
           "Monthly",
           "Quarterly",
@@ -994,9 +1032,7 @@ export async function generateActivities(
     const description = activityTemplate.format(activityData);
 
     // Determine who performed this activity
-    const isSystem = Boolean(
-      "isSystem" in activityTemplate && activityTemplate.isSystem
-    );
+    const isSystem = Boolean(safeCheck(activityTemplate, "isSystem"));
     if (!userId && userIds.length > 0 && !isSystem) {
       userId = userIds[Math.floor(Math.random() * userIds.length)];
     }

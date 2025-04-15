@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { signUpAction } from "../../lib/actions";
+import { signUpAction } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { client } from "@/lib/auth-client";
 import { useEffect } from "react";

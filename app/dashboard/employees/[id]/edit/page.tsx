@@ -13,15 +13,11 @@ import { EmployeeForm } from "../../../../../components/dashboard/employees/empl
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 
-interface EditEmployeePageProps {
-  params: {
-    id: string;
-  };
-}
-
 export default async function EditEmployeePage({
   params,
-}: EditEmployeePageProps) {
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = await params;
   const [employee, departments, positions] = await Promise.all([
     getEmployee(id),

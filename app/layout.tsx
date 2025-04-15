@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "sonner";
 import { NavigationProgress } from "@/components/ui/navigation-progress";
 import { NavigationProvider } from "@/components/ui/navigation-context";
+import { Suspense } from "react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,11 +31,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <NavigationProvider>
-          <NavigationProgress />
-          {children}
-          <Toaster />
-        </NavigationProvider>
+        <Suspense>
+          <NavigationProvider>
+            <NavigationProgress />
+            {children}
+            <Toaster />
+          </NavigationProvider>
+        </Suspense>
       </body>
     </html>
   );

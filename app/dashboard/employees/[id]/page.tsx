@@ -21,14 +21,14 @@ import {
   DollarSign,
 } from "lucide-react";
 
-interface EmployeePageProps {
-  params: {
-    id: string;
-  };
-}
+export default async function EmployeePage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
 
-export default async function EmployeePage({ params }: EmployeePageProps) {
-  const employee = await getEmployee(params.id);
+  const employee = await getEmployee(id);
 
   if (!employee) {
     notFound();

@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { DashboardBreadcrumb } from "@/components/dashboard/breadcrumb";
 import { getEntityNameById } from "@/lib/actions/dashboard";
+import StoreProvider from "../StoreProvider";
 
 export default async function DashboardLayout({
   children,
@@ -45,31 +46,33 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen">
-      {/* Client-side interactive sidebar */}
-      <DashboardSidebar />
+    <StoreProvider>
+      <div className="flex min-h-screen">
+        {/* Client-side interactive sidebar */}
+        <DashboardSidebar />
 
-      {/* Main content */}
-      <div className="flex flex-col flex-1 lg:ml-64">
-        {/* Header - server rendered */}
-        <header className="bg-background border-b h-16 flex items-center justify-between px-6 sticky top-0 z-10">
-          <div className="lg:hidden">
-            {/* Mobile menu trigger placeholder */}
-          </div>
-          <div className="flex-1 lg:hidden"></div>
-          <div>
-            <span className="text-sm font-medium">Welcome, {userName}</span>
-          </div>
-        </header>
+        {/* Main content */}
+        <div className="flex flex-col flex-1 lg:ml-64">
+          {/* Header - server rendered */}
+          <header className="bg-background border-b h-16 flex items-center justify-between px-6 sticky top-0 z-10">
+            <div className="lg:hidden">
+              {/* Mobile menu trigger placeholder */}
+            </div>
+            <div className="flex-1 lg:hidden"></div>
+            <div>
+              <span className="text-sm font-medium">Welcome, {userName}</span>
+            </div>
+          </header>
 
-        {/* Breadcrumb - client component with server-provided data */}
-        <div className="px-6 pt-4">
-          <DashboardBreadcrumb entityTitle={entityTitle} />
+          {/* Breadcrumb - client component with server-provided data */}
+          <div className="px-6 pt-4">
+            <DashboardBreadcrumb entityTitle={entityTitle} />
+          </div>
+
+          {/* Page content */}
+          <main className="flex-1 p-6">{children}</main>
         </div>
-
-        {/* Page content */}
-        <main className="flex-1 p-6">{children}</main>
       </div>
-    </div>
+    </StoreProvider>
   );
 }

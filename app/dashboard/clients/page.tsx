@@ -21,24 +21,20 @@ async function fetchClients({
   sorting: SortingState;
   filters: { id: string; value: string }[];
 }) {
-  // Build the query string
   const params = new URLSearchParams();
   params.append("page", pageIndex.toString());
   params.append("pageSize", pageSize.toString());
 
-  // Add multi-column sorting
   sorting.forEach((sort) => {
     params.append("sorts", `${sort.id}:${sort.desc ? "desc" : "asc"}`);
   });
 
-  // Add multi-column filtering
   filters.forEach((filter) => {
     if (filter.value) {
       params.append("filters", `${filter.id}:${filter.value}`);
     }
   });
 
-  // Fetch data from the API
   const response = await fetch(`/api/clients?${params.toString()}`);
 
   if (!response.ok) {
@@ -49,7 +45,6 @@ async function fetchClients({
 }
 
 export default function ClientsPage() {
-  // State for table controls
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
@@ -59,21 +54,71 @@ export default function ClientsPage() {
     []
   );
 
-  // Derive query parameters from state
+  // Loading states
+  const [isPaginationLoading, setIsPaginationLoading] = useState(false);
+  const [isSortingLoading, setIsSortingLoading] = useState(false);
+  const [isFilteringLoading, setIsFilteringLoading] = useState(false);
+
+  // Query parameters
   const { pageIndex, pageSize } = pagination;
 
-  // Fetch data with react-query
-  const { data, isLoading, isError } = useQuery({
+  // Data fetching
+  const { data, isLoading, isError, isFetching } = useQuery({
     queryKey: ["clients", pageIndex, pageSize, sorting, filters],
     queryFn: () => fetchClients({ pageIndex, pageSize, sorting, filters }),
     placeholderData: keepPreviousData,
   });
 
+  // Update loading states
+  useEffect(() => {
+    if (isFetching) {
+      if (filters.length > 0) {
+        setIsFilteringLoading(true);
+      } else if (sorting.length > 0) {
+        setIsSortingLoading(true);
+      } else {
+        setIsPaginationLoading(true);
+      }
+    } else {
+      setIsFilteringLoading(false);
+      setIsSortingLoading(false);
+      setIsPaginationLoading(false);
+    }
+  }, [isFetching, filters, sorting]);
+
   const handleFilterChange = useCallback(
     (newFilters: { id: string; value: string }[]) => {
+      setIsFilteringLoading(true);
       setFilters(newFilters);
-      // Reset to first page when filters change
       setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+    },
+    []
+  );
+
+  const handleSortingChange = useCallback(
+    (updaterOrValue: SortingState | ((prev: SortingState) => SortingState)) => {
+      setIsSortingLoading(true);
+      if (typeof updaterOrValue === "function") {
+        setSorting(updaterOrValue);
+      } else {
+        setSorting(updaterOrValue);
+      }
+    },
+    []
+  );
+
+  const handlePaginationChange = useCallback(
+    (
+      updaterOrValue:
+        | PaginationState
+        | ((prev: PaginationState) => PaginationState)
+    ) => {
+      setIsPaginationLoading(true);
+      if (typeof updaterOrValue === "function") {
+        setPagination(updaterOrValue);
+      } else {
+        setPagination(updaterOrValue);
+      }
     },
     []
   );
@@ -103,17 +148,18 @@ export default function ClientsPage() {
           <DataTable
             columns={columns}
             data={data?.data || []}
-            searchColumn="name"
-            searchPlaceholder="Search clients..."
             isLoading={isLoading}
             pageCount={data?.pageCount || 0}
             manualPagination={true}
             manualSorting={true}
             manualFiltering={true}
-            onPaginationChange={setPagination}
-            onSortingChange={setSorting}
+            onPaginationChange={handlePaginationChange}
+            onSortingChange={handleSortingChange}
             onFilterChange={handleFilterChange}
             filterableColumns={["name", "industry", "website"]}
+            isPaginationLoading={isPaginationLoading}
+            isSortingLoading={isSortingLoading}
+            isFilteringLoading={isFilteringLoading}
           />
         )}
       </div>

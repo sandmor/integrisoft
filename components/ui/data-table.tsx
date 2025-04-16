@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -42,15 +42,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Loader2 } from "lucide-react";
+import debounce from "lodash.debounce";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data?: TData[];
-  searchColumn?: string;
-  searchPlaceholder?: string;
   isLoading?: boolean;
-  // New props for server-side pagination
   pageCount?: number;
   manualPagination?: boolean;
   manualSorting?: boolean;
@@ -58,15 +56,15 @@ interface DataTableProps<TData, TValue> {
   onPaginationChange?: OnChangeFn<PaginationState>;
   onSortingChange?: OnChangeFn<SortingState>;
   onFilterChange?: (filters: { id: string; value: string }[]) => void;
-  // New props for multi-column filtering
   filterableColumns?: string[];
+  isSortingLoading?: boolean;
+  isFilteringLoading?: boolean;
+  isPaginationLoading?: boolean;
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data = [],
-  searchColumn,
-  searchPlaceholder = "Filter...",
   isLoading = false,
   pageCount = 0,
   manualPagination = false,
@@ -76,6 +74,9 @@ export function DataTable<TData, TValue>({
   onSortingChange,
   onFilterChange,
   filterableColumns = [],
+  isSortingLoading = false,
+  isFilteringLoading = false,
+  isPaginationLoading = false,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -86,24 +87,59 @@ export function DataTable<TData, TValue>({
     pageSize: 10,
   });
 
+  // Loading states for different operations
+  const anyLoading =
+    isLoading || isSortingLoading || isFilteringLoading || isPaginationLoading;
+
   // Handle server-side operations
   const pagination = {
     pageIndex,
     pageSize,
   };
 
-  // Handle filter changes if manual filtering is enabled
+  // Debounce filter changes to prevent UI freezing with rapid typing
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const debouncedFiltersChange = useCallback(
+    debounce((filters: ColumnFiltersState) => {
+      if (manualFiltering && onFilterChange) {
+        onFilterChange(
+          filters.map((filter) => ({
+            id: filter.id,
+            value: filter.value as string,
+          }))
+        );
+      }
+    }, 300),
+    [manualFiltering, onFilterChange]
+  );
+
+  // Use the debounced handler for filter changes
   useEffect(() => {
-    if (manualFiltering && onFilterChange) {
-      // Pass all active filters to the parent component
-      onFilterChange(
-        columnFilters.map((filter) => ({
-          id: filter.id,
-          value: filter.value as string,
-        }))
-      );
+    debouncedFiltersChange(columnFilters);
+    return () => {
+      debouncedFiltersChange.cancel();
+    };
+  }, [columnFilters, debouncedFiltersChange]);
+
+  // Async sorting handler with loading state support
+  const handleSortingChange: OnChangeFn<SortingState> = (updater) => {
+    // If manual sorting, delegate to parent
+    if (manualSorting && onSortingChange) {
+      onSortingChange(updater);
+    } else {
+      // Otherwise handle locally
+      setSorting(updater);
     }
-  }, [columnFilters, manualFiltering, onFilterChange]);
+  };
+
+  // Async pagination handler with loading state support
+  const handlePaginationChange: OnChangeFn<PaginationState> = (updater) => {
+    if (manualPagination && onPaginationChange) {
+      onPaginationChange(updater);
+    } else {
+      setPagination(updater);
+    }
+  };
 
   const table = useReactTable({
     data,
@@ -116,11 +152,11 @@ export function DataTable<TData, TValue>({
       rowSelection,
       pagination,
     },
-    onSortingChange: manualSorting ? onSortingChange : setSorting,
+    onSortingChange: handleSortingChange,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
-    onPaginationChange: manualPagination ? onPaginationChange : setPagination,
+    onPaginationChange: handlePaginationChange,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
@@ -170,58 +206,17 @@ export function DataTable<TData, TValue>({
               </div>
             );
           })}
-
-          {/* Keep the original global search if searchColumn is provided */}
-          {searchColumn && !filterableColumns.includes(searchColumn) && (
-            <div className="flex flex-col space-y-1">
-              <label
-                htmlFor="global-search"
-                className="text-xs font-medium text-muted-foreground"
-              >
-                Global Search
-              </label>
-              <Input
-                id="global-search"
-                placeholder={searchPlaceholder}
-                value={
-                  (table.getColumn(searchColumn)?.getFilterValue() as string) ??
-                  ""
-                }
-                onChange={(event) =>
-                  table
-                    .getColumn(searchColumn)
-                    ?.setFilterValue(event.target.value)
-                }
-                className="h-8 w-[150px] sm:w-[200px]"
-                disabled={isLoading}
-              />
-            </div>
-          )}
         </div>
       )}
 
-      {/* Show simple search if no filterableColumns and searchColumn exists */}
-      {(!filterableColumns || filterableColumns.length === 0) &&
-        searchColumn && (
-          <div className="flex items-center py-4">
-            <Input
-              placeholder={searchPlaceholder}
-              value={
-                (table.getColumn(searchColumn)?.getFilterValue() as string) ??
-                ""
-              }
-              onChange={(event) =>
-                table
-                  .getColumn(searchColumn)
-                  ?.setFilterValue(event.target.value)
-              }
-              className="max-w-sm"
-              disabled={isLoading}
-            />
+      <div className="rounded-md border bg-card relative">
+        {/* Show overlay spinner only when we have data and are performing an operation */}
+        {anyLoading && table.getRowModel().rows.length > 0 && (
+          <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10">
+            <TableLoadingSpinner />
           </div>
         )}
 
-      <div className="rounded-md border bg-card">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -232,11 +227,15 @@ export function DataTable<TData, TValue>({
                       {header.isPlaceholder ? null : (
                         <div
                           className={`flex items-center space-x-2 ${
-                            header.column.getCanSort()
+                            header.column.getCanSort() && !isSortingLoading
                               ? "cursor-pointer select-none"
                               : ""
                           }`}
-                          onClick={header.column.getToggleSortingHandler()}
+                          onClick={
+                            isSortingLoading
+                              ? undefined
+                              : header.column.getToggleSortingHandler()
+                          }
                         >
                           {flexRender(
                             header.column.columnDef.header,
@@ -244,14 +243,19 @@ export function DataTable<TData, TValue>({
                           )}
 
                           {header.column.getCanSort() && (
-                            <div className="ml-2">
-                              {{
-                                asc: <ArrowUp className="h-4 w-4" />,
-                                desc: <ArrowDown className="h-4 w-4" />,
-                                false: (
-                                  <ArrowUpDown className="h-4 w-4 opacity-50" />
-                                ),
-                              }[header.column.getIsSorted() as string] ?? null}
+                            <div className="ml-2 flex items-center">
+                              {isSortingLoading &&
+                              header.column.getIsSorted() ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                {
+                                  asc: <ArrowUp className="h-4 w-4" />,
+                                  desc: <ArrowDown className="h-4 w-4" />,
+                                  false: (
+                                    <ArrowUpDown className="h-4 w-4 opacity-50" />
+                                  ),
+                                }[header.column.getIsSorted() as string] ?? null
+                              )}
                             </div>
                           )}
                         </div>
@@ -263,7 +267,7 @@ export function DataTable<TData, TValue>({
             ))}
           </TableHeader>
           <TableBody>
-            {isLoading ? (
+            {anyLoading && table.getRowModel().rows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 p-0">
                   <TableLoadingSpinner />
@@ -312,11 +316,11 @@ export function DataTable<TData, TValue>({
                   onClick={() => table.previousPage()}
                   tabIndex={0}
                   className={
-                    !table.getCanPreviousPage() || isLoading
+                    !table.getCanPreviousPage() || anyLoading
                       ? "pointer-events-none opacity-50"
                       : ""
                   }
-                  aria-disabled={!table.getCanPreviousPage() || isLoading}
+                  aria-disabled={!table.getCanPreviousPage() || anyLoading}
                 />
               </PaginationItem>
 
@@ -326,8 +330,8 @@ export function DataTable<TData, TValue>({
                   onClick={() => table.setPageIndex(0)}
                   isActive={table.getState().pagination.pageIndex === 0}
                   tabIndex={0}
-                  className={isLoading ? "pointer-events-none opacity-50" : ""}
-                  aria-disabled={isLoading}
+                  className={anyLoading ? "pointer-events-none opacity-50" : ""}
+                  aria-disabled={anyLoading}
                 >
                   1
                 </PaginationLink>
@@ -355,11 +359,15 @@ export function DataTable<TData, TValue>({
                       isActive={true}
                       tabIndex={0}
                       className={
-                        isLoading ? "pointer-events-none opacity-50" : ""
+                        anyLoading ? "pointer-events-none opacity-50" : ""
                       }
-                      aria-disabled={isLoading}
+                      aria-disabled={anyLoading}
                     >
-                      {table.getState().pagination.pageIndex + 1}
+                      {isPaginationLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin mx-1" />
+                      ) : (
+                        table.getState().pagination.pageIndex + 1
+                      )}
                     </PaginationLink>
                   </PaginationItem>
                 )}
@@ -384,9 +392,9 @@ export function DataTable<TData, TValue>({
                     }
                     tabIndex={0}
                     className={
-                      isLoading ? "pointer-events-none opacity-50" : ""
+                      anyLoading ? "pointer-events-none opacity-50" : ""
                     }
-                    aria-disabled={isLoading}
+                    aria-disabled={anyLoading}
                   >
                     {table.getPageCount()}
                   </PaginationLink>
@@ -398,11 +406,11 @@ export function DataTable<TData, TValue>({
                   onClick={() => table.nextPage()}
                   tabIndex={0}
                   className={
-                    !table.getCanNextPage() || isLoading
+                    !table.getCanNextPage() || anyLoading
                       ? "pointer-events-none opacity-50"
                       : ""
                   }
-                  aria-disabled={!table.getCanNextPage() || isLoading}
+                  aria-disabled={!table.getCanNextPage() || anyLoading}
                 />
               </PaginationItem>
             </PaginationContent>
@@ -415,7 +423,7 @@ export function DataTable<TData, TValue>({
             <Select
               value={`${table.getState().pagination.pageSize}`}
               onValueChange={(value) => table.setPageSize(Number(value))}
-              disabled={isLoading}
+              disabled={anyLoading}
             >
               <SelectTrigger
                 className="h-8 w-[70px]"

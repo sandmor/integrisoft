@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,6 @@ import { columns } from "./columns";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { SortingState, PaginationState } from "@tanstack/react-table";
 
-// Fetch employee data from API
 async function fetchEmployees({
   pageIndex,
   pageSize,
@@ -21,24 +20,20 @@ async function fetchEmployees({
   sorting: SortingState;
   filters: { id: string; value: string }[];
 }) {
-  // Build the query string
   const params = new URLSearchParams();
   params.append("page", pageIndex.toString());
   params.append("pageSize", pageSize.toString());
 
-  // Add multi-column sorting
   sorting.forEach((sort) => {
     params.append("sorts", `${sort.id}:${sort.desc ? "desc" : "asc"}`);
   });
 
-  // Add multi-column filtering
   filters.forEach((filter) => {
     if (filter.value) {
       params.append("filters", `${filter.id}:${filter.value}`);
     }
   });
 
-  // Fetch data from the API
   const response = await fetch(`/api/employees?${params.toString()}`);
 
   if (!response.ok) {
@@ -49,7 +44,6 @@ async function fetchEmployees({
 }
 
 export default function EmployeesPage() {
-  // State for table controls
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
@@ -59,21 +53,67 @@ export default function EmployeesPage() {
     []
   );
 
-  // Derive query parameters from state
+  const [isPaginationLoading, setIsPaginationLoading] = useState(false);
+  const [isSortingLoading, setIsSortingLoading] = useState(false);
+  const [isFilteringLoading, setIsFilteringLoading] = useState(false);
+
   const { pageIndex, pageSize } = pagination;
 
-  // Fetch data with react-query
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, isFetching } = useQuery({
     queryKey: ["employees", pageIndex, pageSize, sorting, filters],
     queryFn: () => fetchEmployees({ pageIndex, pageSize, sorting, filters }),
     placeholderData: keepPreviousData,
   });
 
+  useEffect(() => {
+    if (isFetching) {
+      if (filters.length > 0) {
+        setIsFilteringLoading(true);
+      } else if (sorting.length > 0) {
+        setIsSortingLoading(true);
+      } else {
+        setIsPaginationLoading(true);
+      }
+    } else {
+      setIsFilteringLoading(false);
+      setIsSortingLoading(false);
+      setIsPaginationLoading(false);
+    }
+  }, [isFetching, filters, sorting]);
+
   const handleFilterChange = useCallback(
     (newFilters: { id: string; value: string }[]) => {
+      setIsFilteringLoading(true);
       setFilters(newFilters);
-      // Reset to first page when filters change
       setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+    },
+    []
+  );
+
+  const handleSortingChange = useCallback(
+    (updaterOrValue: SortingState | ((prev: SortingState) => SortingState)) => {
+      setIsSortingLoading(true);
+      if (typeof updaterOrValue === "function") {
+        setSorting(updaterOrValue);
+      } else {
+        setSorting(updaterOrValue);
+      }
+    },
+    []
+  );
+
+  const handlePaginationChange = useCallback(
+    (
+      updaterOrValue:
+        | PaginationState
+        | ((prev: PaginationState) => PaginationState)
+    ) => {
+      setIsPaginationLoading(true);
+      if (typeof updaterOrValue === "function") {
+        setPagination(updaterOrValue);
+      } else {
+        setPagination(updaterOrValue);
+      }
     },
     []
   );
@@ -103,15 +143,13 @@ export default function EmployeesPage() {
           <DataTable
             columns={columns}
             data={data?.data || []}
-            searchColumn="name"
-            searchPlaceholder="Search employees..."
             isLoading={isLoading}
             pageCount={data?.pageCount || 0}
             manualPagination={true}
             manualSorting={true}
             manualFiltering={true}
-            onPaginationChange={setPagination}
-            onSortingChange={setSorting}
+            onPaginationChange={handlePaginationChange}
+            onSortingChange={handleSortingChange}
             onFilterChange={handleFilterChange}
             filterableColumns={[
               "name",
@@ -120,6 +158,9 @@ export default function EmployeesPage() {
               "department",
               "position",
             ]}
+            isPaginationLoading={isPaginationLoading}
+            isSortingLoading={isSortingLoading}
+            isFilteringLoading={isFilteringLoading}
           />
         )}
       </div>

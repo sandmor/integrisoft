@@ -11,12 +11,19 @@ import {
   projects,
   users,
 } from "../db/schema";
-import { eq, and, desc, count, inArray } from "drizzle-orm";
+import { eq, and, desc, count, inArray, ilike, asc } from "drizzle-orm";
 import { headers } from "next/headers";
 
-export async function getClients() {
-  // Get all non-deleted clients with related data
-  const results = await db
+export async function getClients(options?: {
+  page?: number;
+  pageSize?: number;
+  sorts?: Array<{ field: string; direction: "asc" | "desc" }>;
+  filters?: Array<{ field: string; value: string }>;
+}) {
+  const { page = 0, pageSize = 10, sorts = [], filters = [] } = options || {};
+
+  // Build the base query
+  let query = db
     .select({
       id: clients.id,
       name: clients.name,
@@ -31,6 +38,98 @@ export async function getClients() {
     .leftJoin(employees, eq(clients.accountManagerId, employees.id))
     .leftJoin(users, eq(employees.userId, users.id))
     .where(eq(clients.isDeleted, false));
+
+  // Prepare filter conditions
+  const filterConditions = [];
+
+  // Always start with isDeleted = false
+  filterConditions.push(eq(clients.isDeleted, false));
+
+  // Add filter conditions for each filter
+  for (const filter of filters) {
+    if (filter.value && filter.value.trim() !== "") {
+      switch (filter.field) {
+        case "name":
+          filterConditions.push(ilike(clients.name, `%${filter.value}%`));
+          break;
+        case "industry":
+          filterConditions.push(ilike(clients.industry, `%${filter.value}%`));
+          break;
+        case "website":
+          filterConditions.push(ilike(clients.website, `%${filter.value}%`));
+          break;
+        case "accountManager":
+          filterConditions.push(ilike(users.name, `%${filter.value}%`));
+          break;
+      }
+    }
+  }
+
+  // Count total matching records
+  const totalCount = await db
+    .select({ count: count() })
+    .from(clients)
+    .leftJoin(employees, eq(clients.accountManagerId, employees.id))
+    .leftJoin(users, eq(employees.userId, users.id))
+    .where(and(...filterConditions))
+    .then((res) => Number(res[0]?.count || 0));
+
+  // Prepare sort parameters
+  const sortParams = [];
+
+  if (sorts.length > 0) {
+    for (const sort of sorts) {
+      switch (sort.field) {
+        case "name":
+          sortParams.push(
+            sort.direction === "asc" ? asc(clients.name) : desc(clients.name)
+          );
+          break;
+        case "industry":
+          sortParams.push(
+            sort.direction === "asc"
+              ? asc(clients.industry)
+              : desc(clients.industry)
+          );
+          break;
+        case "website":
+          sortParams.push(
+            sort.direction === "asc"
+              ? asc(clients.website)
+              : desc(clients.website)
+          );
+          break;
+        case "accountManager":
+          sortParams.push(
+            sort.direction === "asc" ? asc(users.name) : desc(users.name)
+          );
+          break;
+      }
+    }
+  }
+
+  // Build the final query with filters, sorting, and pagination
+  const finalQuery = db
+    .select({
+      id: clients.id,
+      name: clients.name,
+      industry: clients.industry,
+      website: clients.website,
+      accountManager: {
+        id: employees.id,
+        name: users.name,
+      },
+    })
+    .from(clients)
+    .leftJoin(employees, eq(clients.accountManagerId, employees.id))
+    .leftJoin(users, eq(employees.userId, users.id))
+    .where(and(...filterConditions))
+    .orderBy(...sortParams)
+    .limit(pageSize)
+    .offset(page * pageSize);
+
+  // Execute the query
+  const results = await finalQuery;
 
   // Get project counts for each client
   const clientIds = results.map((client) => client.id);
@@ -51,10 +150,15 @@ export async function getClients() {
   );
 
   // Return clients with project counts
-  return results.map((client) => ({
+  const data = results.map((client) => ({
     ...client,
     projectCount: projectCountMap.get(client.id) || 0,
   }));
+
+  return {
+    data,
+    count: totalCount,
+  };
 }
 
 export async function getClientById(id: string) {

@@ -4,6 +4,7 @@ import "./globals.css";
 import { Toaster } from "sonner";
 import { NavigationProgress } from "@/components/ui/navigation-progress";
 import { NavigationProvider } from "@/components/ui/navigation-context";
+import { ReactQueryProvider } from "@/components/providers/react-query-provider";
 import { Suspense } from "react";
 
 const geistSans = Geist({
@@ -31,13 +32,15 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Suspense>
-          <NavigationProvider>
-            <NavigationProgress />
-            {children}
-            <Toaster />
-          </NavigationProvider>
-        </Suspense>
+        <ReactQueryProvider>
+          <Suspense>
+            <NavigationProvider>
+              <NavigationProgress />
+              {children}
+              <Toaster />
+            </NavigationProvider>
+          </Suspense>
+        </ReactQueryProvider>
       </body>
     </html>
   );

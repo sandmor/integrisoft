@@ -8,7 +8,7 @@ import {
   users,
   accounts,
 } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or, desc, count, ilike, asc } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
@@ -103,32 +103,149 @@ export async function getPositions(departmentId?: string): Promise<Position[]> {
   }
 }
 
-export async function getEmployees(): Promise<Employee[]> {
-  try {
-    const result = await db.query.employees.findMany({
-      with: {
-        users: true,
-        departments: true,
-        positions: true,
-      },
-      where: (employees, { eq }) => eq(employees.isDeleted, false),
-    });
+export async function getEmployees(options?: {
+  page?: number;
+  pageSize?: number;
+  sorts?: Array<{ field: string; direction: "asc" | "desc" }>;
+  filters?: Array<{ field: string; value: string }>;
+}): Promise<{ data: Employee[]; count: number }> {
+  const { page = 0, pageSize = 10, sorts = [], filters = [] } = options || {};
 
-    return result.map((employee) => ({
+  try {
+    // Prepare filter conditions
+    const filterConditions = [];
+
+    // Always start with isDeleted = false
+    filterConditions.push(eq(employees.isDeleted, false));
+
+    // Add filter conditions for each filter
+    for (const filter of filters) {
+      if (filter.value && filter.value.trim() !== "") {
+        switch (filter.field) {
+          case "name":
+            filterConditions.push(ilike(users.name, `%${filter.value}%`));
+            break;
+          case "lastName":
+            filterConditions.push(ilike(users.lastName, `%${filter.value}%`));
+            break;
+          case "email":
+            filterConditions.push(ilike(users.email, `%${filter.value}%`));
+            break;
+          case "department":
+            filterConditions.push(ilike(departments.name, `%${filter.value}%`));
+            break;
+          case "position":
+            filterConditions.push(ilike(positions.title, `%${filter.value}%`));
+            break;
+        }
+      }
+    }
+
+    // Count total matching records
+    const countResult = await db
+      .select({ count: count() })
+      .from(employees)
+      .leftJoin(users, eq(employees.userId, users.id))
+      .leftJoin(departments, eq(employees.departmentId, departments.id))
+      .leftJoin(positions, eq(employees.positionId, positions.id))
+      .where(and(...filterConditions))
+      .then((res) => Number(res[0]?.count || 0));
+
+    // Prepare sort parameters
+    const sortParams = [];
+
+    if (sorts.length > 0) {
+      for (const sort of sorts) {
+        switch (sort.field) {
+          case "name":
+            sortParams.push(
+              sort.direction === "asc" ? asc(users.name) : desc(users.name)
+            );
+            break;
+          case "lastName":
+            sortParams.push(
+              sort.direction === "asc"
+                ? asc(users.lastName)
+                : desc(users.lastName)
+            );
+            break;
+          case "email":
+            sortParams.push(
+              sort.direction === "asc" ? asc(users.email) : desc(users.email)
+            );
+            break;
+          case "department":
+            sortParams.push(
+              sort.direction === "asc"
+                ? asc(departments.name)
+                : desc(departments.name)
+            );
+            break;
+          case "position":
+            sortParams.push(
+              sort.direction === "asc"
+                ? asc(positions.title)
+                : desc(positions.title)
+            );
+            break;
+          case "hireDate":
+            sortParams.push(
+              sort.direction === "asc"
+                ? asc(employees.hireDate)
+                : desc(employees.hireDate)
+            );
+            break;
+        }
+      }
+    }
+
+    // Build the final query with all filters, sorts, and pagination
+    const finalQuery = db
+      .select({
+        id: employees.id,
+        name: users.name,
+        lastName: users.lastName,
+        email: users.email,
+        department: departments.name,
+        position: positions.title,
+        hireDate: employees.hireDate,
+        salary: employees.salary,
+        contactEmail: employees.contactEmail,
+        contactPhone: employees.contactPhone,
+      })
+      .from(employees)
+      .leftJoin(users, eq(employees.userId, users.id))
+      .leftJoin(departments, eq(employees.departmentId, departments.id))
+      .leftJoin(positions, eq(employees.positionId, positions.id))
+      .where(and(...filterConditions))
+      .orderBy(...sortParams)
+      .limit(pageSize)
+      .offset(page * pageSize);
+
+    // Execute the query
+    const results = await finalQuery;
+
+    // Map the results to the Employee type
+    const data = results.map((employee) => ({
       id: employee.id,
-      name: employee.users?.name || "N/A",
-      lastName: employee.users?.lastName || "N/A",
-      email: employee.users?.email || "N/A",
-      department: employee.departments?.name || null,
-      position: employee.positions?.title || null,
+      name: employee.name || "N/A",
+      lastName: employee.lastName || "N/A",
+      email: employee.email || "N/A",
+      department: employee.department || null,
+      position: employee.position || null,
       hireDate: employee.hireDate,
       salary: employee.salary ? Number(employee.salary) : null,
       contactEmail: employee.contactEmail || null,
       contactPhone: employee.contactPhone || null,
     }));
+
+    return {
+      data,
+      count: countResult,
+    };
   } catch (error) {
     console.error("Error fetching employees:", error);
-    return [];
+    return { data: [], count: 0 };
   }
 }
 

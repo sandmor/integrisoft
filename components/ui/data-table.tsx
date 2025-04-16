@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -8,10 +8,12 @@ import {
   VisibilityState,
   flexRender,
   getCoreRowModel,
-  getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
+  getFilteredRowModel,
   useReactTable,
+  PaginationState,
+  OnChangeFn,
 } from "@tanstack/react-table";
 
 import {
@@ -22,7 +24,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TableLoadingSpinner } from "./spinner";
 import {
@@ -45,60 +46,181 @@ import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
-  data: TData[];
+  data?: TData[];
   searchColumn?: string;
   searchPlaceholder?: string;
   isLoading?: boolean;
+  // New props for server-side pagination
+  pageCount?: number;
+  manualPagination?: boolean;
+  manualSorting?: boolean;
+  manualFiltering?: boolean;
+  onPaginationChange?: OnChangeFn<PaginationState>;
+  onSortingChange?: OnChangeFn<SortingState>;
+  onFilterChange?: (filters: { id: string; value: string }[]) => void;
+  // New props for multi-column filtering
+  filterableColumns?: string[];
 }
 
 export function DataTable<TData, TValue>({
   columns,
-  data,
+  data = [],
   searchColumn,
   searchPlaceholder = "Filter...",
   isLoading = false,
+  pageCount = 0,
+  manualPagination = false,
+  manualSorting = false,
+  manualFiltering = false,
+  onPaginationChange,
+  onSortingChange,
+  onFilterChange,
+  filterableColumns = [],
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = useState({});
+  const [{ pageIndex, pageSize }, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
+
+  // Handle server-side operations
+  const pagination = {
+    pageIndex,
+    pageSize,
+  };
+
+  // Handle filter changes if manual filtering is enabled
+  useEffect(() => {
+    if (manualFiltering && onFilterChange) {
+      // Pass all active filters to the parent component
+      onFilterChange(
+        columnFilters.map((filter) => ({
+          id: filter.id,
+          value: filter.value as string,
+        }))
+      );
+    }
+  }, [columnFilters, manualFiltering, onFilterChange]);
 
   const table = useReactTable({
     data,
     columns,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
+    pageCount: manualPagination ? pageCount : undefined,
     state: {
       sorting,
       columnFilters,
       columnVisibility,
       rowSelection,
+      pagination,
     },
+    onSortingChange: manualSorting ? onSortingChange : setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    onPaginationChange: manualPagination ? onPaginationChange : setPagination,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    manualPagination,
+    manualSorting,
+    manualFiltering,
   });
 
   return (
     <div className="w-full">
-      {searchColumn && (
-        <div className="flex items-center py-4">
-          <Input
-            placeholder={searchPlaceholder}
-            value={
-              (table.getColumn(searchColumn)?.getFilterValue() as string) ?? ""
-            }
-            onChange={(event) =>
-              table.getColumn(searchColumn)?.setFilterValue(event.target.value)
-            }
-            className="max-w-sm"
-            disabled={isLoading}
-          />
+      {/* Multi-column filter section */}
+      {filterableColumns && filterableColumns.length > 0 && (
+        <div className="flex flex-wrap items-center gap-4 py-4">
+          {filterableColumns.map((columnId) => {
+            const column = table.getColumn(columnId);
+            if (!column) return null;
+
+            const columnDef = columns.find(
+              (col) => "accessorKey" in col && col.accessorKey === columnId
+            );
+            const columnName =
+              columnDef && "header" in columnDef
+                ? typeof columnDef.header === "string"
+                  ? columnDef.header
+                  : columnId
+                : columnId;
+
+            return (
+              <div key={columnId} className="flex flex-col space-y-1">
+                <label
+                  htmlFor={`filter-${columnId}`}
+                  className="text-xs font-medium text-muted-foreground"
+                >
+                  {columnName}
+                </label>
+                <Input
+                  id={`filter-${columnId}`}
+                  placeholder={`Filter ${columnName}...`}
+                  value={(column.getFilterValue() as string) ?? ""}
+                  onChange={(event) =>
+                    column.setFilterValue(event.target.value)
+                  }
+                  className="h-8 w-[150px] sm:w-[200px]"
+                  disabled={isLoading}
+                />
+              </div>
+            );
+          })}
+
+          {/* Keep the original global search if searchColumn is provided */}
+          {searchColumn && !filterableColumns.includes(searchColumn) && (
+            <div className="flex flex-col space-y-1">
+              <label
+                htmlFor="global-search"
+                className="text-xs font-medium text-muted-foreground"
+              >
+                Global Search
+              </label>
+              <Input
+                id="global-search"
+                placeholder={searchPlaceholder}
+                value={
+                  (table.getColumn(searchColumn)?.getFilterValue() as string) ??
+                  ""
+                }
+                onChange={(event) =>
+                  table
+                    .getColumn(searchColumn)
+                    ?.setFilterValue(event.target.value)
+                }
+                className="h-8 w-[150px] sm:w-[200px]"
+                disabled={isLoading}
+              />
+            </div>
+          )}
         </div>
       )}
+
+      {/* Show simple search if no filterableColumns and searchColumn exists */}
+      {(!filterableColumns || filterableColumns.length === 0) &&
+        searchColumn && (
+          <div className="flex items-center py-4">
+            <Input
+              placeholder={searchPlaceholder}
+              value={
+                (table.getColumn(searchColumn)?.getFilterValue() as string) ??
+                ""
+              }
+              onChange={(event) =>
+                table
+                  .getColumn(searchColumn)
+                  ?.setFilterValue(event.target.value)
+              }
+              className="max-w-sm"
+              disabled={isLoading}
+            />
+          </div>
+        )}
+
       <div className="rounded-md border bg-card">
         <Table>
           <TableHeader>

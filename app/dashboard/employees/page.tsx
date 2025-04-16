@@ -1,39 +1,83 @@
-import { Suspense } from "react";
+"use client";
+
+import { useCallback, useState } from "react";
 import Link from "next/link";
-import { getEmployees } from "@/lib/actions/employees";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { columns } from "./columns";
-import { tryCatch } from "@/lib/error-handler";
-import { Spinner } from "@/components/ui/spinner";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { SortingState, PaginationState } from "@tanstack/react-table";
 
-async function EmployeesTable() {
-  const employees =
-    (await tryCatch(() => getEmployees(), {
-      customErrorMessage: "Failed to load employees data",
-    })) || [];
+// Fetch employee data from API
+async function fetchEmployees({
+  pageIndex,
+  pageSize,
+  sorting,
+  filters,
+}: {
+  pageIndex: number;
+  pageSize: number;
+  sorting: SortingState;
+  filters: { id: string; value: string }[];
+}) {
+  // Build the query string
+  const params = new URLSearchParams();
+  params.append("page", pageIndex.toString());
+  params.append("pageSize", pageSize.toString());
 
-  return (
-    <DataTable
-      columns={columns}
-      data={employees}
-      searchColumn="name"
-      searchPlaceholder="Search employees..."
-    />
-  );
-}
+  // Add multi-column sorting
+  sorting.forEach((sort) => {
+    params.append("sorts", `${sort.id}:${sort.desc ? "desc" : "asc"}`);
+  });
 
-function EmployeesTableFallback() {
-  return (
-    <div className="w-full flex justify-center items-center py-12">
-      <Spinner size="large" />
-      <span className="ml-3 text-lg">Loading employees...</span>
-    </div>
-  );
+  // Add multi-column filtering
+  filters.forEach((filter) => {
+    if (filter.value) {
+      params.append("filters", `${filter.id}:${filter.value}`);
+    }
+  });
+
+  // Fetch data from the API
+  const response = await fetch(`/api/employees?${params.toString()}`);
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch employees");
+  }
+
+  return response.json();
 }
 
 export default function EmployeesPage() {
+  // State for table controls
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
+  const [filters, setFilters] = useState<Array<{ id: string; value: string }>>(
+    []
+  );
+
+  // Derive query parameters from state
+  const { pageIndex, pageSize } = pagination;
+
+  // Fetch data with react-query
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["employees", pageIndex, pageSize, sorting, filters],
+    queryFn: () => fetchEmployees({ pageIndex, pageSize, sorting, filters }),
+    placeholderData: keepPreviousData,
+  });
+
+  const handleFilterChange = useCallback(
+    (newFilters: { id: string; value: string }[]) => {
+      setFilters(newFilters);
+      // Reset to first page when filters change
+      setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+    },
+    []
+  );
+
   return (
     <>
       <div className="flex justify-between items-center border-b px-6 py-4">
@@ -51,9 +95,33 @@ export default function EmployeesPage() {
         </Button>
       </div>
       <div className="p-6">
-        <Suspense fallback={<EmployeesTableFallback />}>
-          <EmployeesTable />
-        </Suspense>
+        {isError ? (
+          <div className="text-center py-4 text-red-600">
+            Error loading employees. Please try again.
+          </div>
+        ) : (
+          <DataTable
+            columns={columns}
+            data={data?.data || []}
+            searchColumn="name"
+            searchPlaceholder="Search employees..."
+            isLoading={isLoading}
+            pageCount={data?.pageCount || 0}
+            manualPagination={true}
+            manualSorting={true}
+            manualFiltering={true}
+            onPaginationChange={setPagination}
+            onSortingChange={setSorting}
+            onFilterChange={handleFilterChange}
+            filterableColumns={[
+              "name",
+              "lastName",
+              "email",
+              "department",
+              "position",
+            ]}
+          />
+        )}
       </div>
     </>
   );

@@ -40,23 +40,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
-type Milestone = {
-  id: string;
-  name: string;
-  description: string | null;
-  dueDate: Date | null;
-  completedDate: Date | null;
-  isCompleted: boolean;
-};
+import { Milestone, useDeleteMilestoneMutation } from "@/lib/redux/projectsApi";
+import { toast } from "sonner";
 
 type MilestoneTimelineProps = {
   milestones: Milestone[];
   projectId?: string;
-  onMilestoneDelete?: (milestoneId: string) => void;
 };
 
-// Helper function to determine milestone status
 function getMilestoneStatus(milestone: Milestone) {
   if (milestone.isCompleted) {
     return {
@@ -104,13 +95,12 @@ function getMilestoneStatus(milestone: Milestone) {
 export function MilestoneTimeline({
   milestones,
   projectId,
-  onMilestoneDelete,
 }: MilestoneTimelineProps) {
-  const [isDeleting, setIsDeleting] = useState(false);
   const [deletingMilestoneId, setDeletingMilestoneId] = useState<string | null>(
     null
   );
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleteMilestone, { isLoading: isDeleteLoading }] =
+    useDeleteMilestoneMutation();
 
   const handleDeleteClick = (milestoneId: string) => {
     setDeletingMilestoneId(milestoneId);
@@ -118,39 +108,23 @@ export function MilestoneTimeline({
 
   const handleDeleteCancel = () => {
     setDeletingMilestoneId(null);
-    setDeleteError(null);
   };
 
   const handleDeleteConfirm = async () => {
     if (!deletingMilestoneId || !projectId) return;
 
-    setIsDeleting(true);
-    setDeleteError(null);
-
     try {
-      const response = await fetch(
-        `/api/projects/${projectId}/milestones/${deletingMilestoneId}`,
-        {
-          method: "DELETE",
-        }
-      );
+      await deleteMilestone({
+        projectId,
+        milestoneId: deletingMilestoneId,
+      }).unwrap();
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to delete milestone");
-      }
-
-      // Call the onDelete callback if provided
-      if (onMilestoneDelete) {
-        onMilestoneDelete(deletingMilestoneId);
-      }
+      toast.success("Milestone deleted successfully");
     } catch (error) {
-      console.error("Error deleting milestone:", error);
-      setDeleteError(
+      toast.error(
         error instanceof Error ? error.message : "Failed to delete milestone"
       );
     } finally {
-      setIsDeleting(false);
       setDeletingMilestoneId(null);
     }
   };
@@ -267,7 +241,6 @@ export function MilestoneTimeline({
         })}
       </div>
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog
         open={!!deletingMilestoneId}
         onOpenChange={(open) => !open && handleDeleteCancel()}
@@ -277,19 +250,18 @@ export function MilestoneTimeline({
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently delete this milestone.
-              {deleteError && (
-                <p className="mt-2 text-red-600">{deleteError}</p>
-              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleteLoading}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteConfirm}
-              disabled={isDeleting}
+              disabled={isDeleteLoading}
               className="bg-red-600 focus:ring-red-600"
             >
-              {isDeleting ? "Deleting..." : "Delete"}
+              {isDeleteLoading ? "Deleting..." : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -4,9 +4,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
-import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { CalendarIcon, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -35,7 +35,10 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { createProject, updateProject } from "@/lib/actions/projects";
+import {
+  useAddProjectMutation,
+  useUpdateProjectMutation,
+} from "@/lib/redux/projectsApi";
 
 // Project status options
 const PROJECT_STATUS_OPTIONS = [
@@ -117,6 +120,12 @@ export function ProjectForm({
   const router = useRouter();
   const isEditMode = !!initialData;
 
+  // RTK Query mutations
+  const [addProject, { isLoading: isCreating }] = useAddProjectMutation();
+  const [updateProject, { isLoading: isUpdating }] = useUpdateProjectMutation();
+
+  const isSubmitting = isCreating || isUpdating;
+
   // Set up the form with validation and initial values
   const form = useForm<ProjectFormValues>({
     resolver: zodResolver(projectFormSchema),
@@ -144,9 +153,8 @@ export function ProjectForm({
         },
   });
 
-  // Handle form submission with React Query for better UX
-  const mutation = useMutation({
-    mutationFn: async (values: ProjectFormValues) => {
+  const onSubmit = async (values: ProjectFormValues) => {
+    try {
       // Parse the budget to a number if present
       const numericBudget = values.budget
         ? parseFloat(values.budget)
@@ -155,23 +163,28 @@ export function ProjectForm({
       const projectData = {
         ...values,
         budget: numericBudget,
+        startDate: values.startDate || undefined,
+        targetEndDate: values.targetEndDate || undefined,
       };
 
       if (isEditMode) {
-        return updateProject(initialData.id, projectData);
+        await updateProject({
+          id: initialData.id,
+          ...projectData,
+        }).unwrap();
+        toast.success("Project updated successfully");
       } else {
-        return createProject(projectData);
+        const result = await addProject(projectData).unwrap();
+        toast.success("Project created successfully");
       }
-    },
-    onSuccess: (data) => {
+
       // Redirect to the project list page after successful submission
       router.push("/dashboard/projects");
       router.refresh();
-    },
-  });
-
-  const onSubmit = (values: ProjectFormValues) => {
-    mutation.mutate(values);
+    } catch (error) {
+      console.error("Failed to save project:", error);
+      toast.error("Failed to save project. Please try again.");
+    }
   };
 
   return (
@@ -409,10 +422,8 @@ export function ProjectForm({
           <Button type="button" variant="outline" onClick={() => router.back()}>
             Cancel
           </Button>
-          <Button type="submit" disabled={mutation.isPending}>
-            {mutation.isPending && (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            )}
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isEditMode ? "Update Project" : "Create Project"}
           </Button>
         </div>

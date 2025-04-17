@@ -1,16 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,16 +39,11 @@ import {
 import { Calendar, MoreVertical, PlusCircle, Users } from "lucide-react";
 import { toast } from "sonner";
 import { TeamMemberForm } from "./team-member-form";
-
-type TeamMember = {
-  id: string;
-  employeeId: string;
-  name: string;
-  role: string;
-  allocationPercentage: number;
-  startDate: Date | null;
-  endDate: Date | null;
-};
+import {
+  TeamMember,
+  useGetTeamMembersQuery,
+  useDeleteTeamMemberMutation,
+} from "@/lib/redux/projectsApi";
 
 type Employee = {
   id: string;
@@ -68,35 +62,19 @@ export function TeamMembersTab({
   teamMembers: initialTeamMembers,
 }: TeamMembersTabProps) {
   const router = useRouter();
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(
-    initialTeamMembers || []
-  );
-  const [isLoading, setIsLoading] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
 
-  // Fetch team members when the component mounts or when the projectId changes
-  useEffect(() => {
-    const fetchTeamMembers = async () => {
-      try {
-        setIsLoading(true);
-        const response = await fetch(`/api/projects/${projectId}/team-members`);
-        if (response.ok) {
-          const data = await response.json();
-          setTeamMembers(data);
-        }
-      } catch (error) {
-        console.error("Error fetching team members:", error);
-        toast.error("Failed to load team members");
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const {
+    data: teamMembers = initialTeamMembers,
+    isLoading,
+    refetch,
+  } = useGetTeamMembersQuery(projectId);
 
-    fetchTeamMembers();
-  }, [projectId]);
+  const [deleteTeamMember, { isLoading: isDeleting }] =
+    useDeleteTeamMemberMutation();
 
   const getInitials = (name: string) => {
     return name
@@ -129,32 +107,17 @@ export function TeamMembersTab({
     if (!selectedMember) return;
 
     try {
-      setIsLoading(true);
-      const response = await fetch(
-        `/api/projects/${projectId}/team-members/${selectedMember.id}`,
-        {
-          method: "DELETE",
-        }
-      );
+      await deleteTeamMember({
+        projectId,
+        teamMemberId: selectedMember.id,
+      }).unwrap();
 
-      if (response.ok) {
-        // Remove the member from the local state
-        setTeamMembers((prev) =>
-          prev.filter((m) => m.id !== selectedMember.id)
-        );
-        toast.success("Team member removed successfully");
-
-        // Refresh the page data
-        router.refresh();
-      } else {
-        const error = await response.json();
-        toast.error(error.error || "Failed to remove team member");
-      }
+      toast.success("Team member removed successfully");
+      router.refresh();
     } catch (error) {
       console.error("Error removing team member:", error);
       toast.error("Failed to remove team member");
     } finally {
-      setIsLoading(false);
       setIsDeleteDialogOpen(false);
       setSelectedMember(null);
     }
@@ -164,6 +127,7 @@ export function TeamMembersTab({
     setIsAddDialogOpen(false);
     setIsEditDialogOpen(false);
     setSelectedMember(null);
+    refetch();
   };
 
   if (isLoading && teamMembers.length === 0) {
@@ -195,7 +159,6 @@ export function TeamMembersTab({
           </div>
         </div>
 
-        {/* Add Member Dialog */}
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
@@ -280,7 +243,6 @@ export function TeamMembersTab({
         ))}
       </div>
 
-      {/* Add Member Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -298,7 +260,6 @@ export function TeamMembersTab({
         </DialogContent>
       </Dialog>
 
-      {/* Edit Member Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -319,7 +280,6 @@ export function TeamMembersTab({
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog
         open={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
@@ -333,16 +293,16 @@ export function TeamMembersTab({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault();
                 confirmDeleteMember();
               }}
-              disabled={isLoading}
+              disabled={isDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isLoading ? "Removing..." : "Remove"}
+              {isDeleting ? "Removing..." : "Remove"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,9 +19,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Combobox, ComboboxOption } from "@/components/ui/combobox";
-import { createClient, updateClient } from "@/lib/actions/clients";
+import {
+  useAddClientMutation,
+  useUpdateClientMutation,
+} from "@/lib/redux/clientsApi";
 
-// Define the form schema with validation
 const clientFormSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   industry: z.string().optional(),
@@ -49,11 +50,9 @@ interface ClientFormProps {
   accountManagers: { id: string; name: string }[];
 }
 
-// Helper to convert account managers to combobox options
 function managersToOptions(
   managers: { id: string; name: string }[]
 ): ComboboxOption[] {
-  // Add an "Unassigned" option at the beginning
   return [
     { value: "", label: "Unassigned" },
     ...managers.map((manager) => ({
@@ -65,11 +64,14 @@ function managersToOptions(
 
 export function ClientForm({ client, accountManagers }: ClientFormProps) {
   const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditing = !!client;
   const accountManagerOptions = managersToOptions(accountManagers);
 
-  // Initialize form with client data or defaults
+  const [addClient, { isLoading: isCreating }] = useAddClientMutation();
+  const [updateClient, { isLoading: isUpdating }] = useUpdateClientMutation();
+
+  const isSubmitting = isCreating || isUpdating;
+
   const form = useForm<ClientFormValues>({
     resolver: zodResolver(clientFormSchema),
     defaultValues: {
@@ -82,22 +84,26 @@ export function ClientForm({ client, accountManagers }: ClientFormProps) {
   });
 
   async function onSubmit(data: ClientFormValues) {
-    setIsSubmitting(true);
     try {
       if (isEditing && client) {
-        await updateClient(client.id, data);
+        await updateClient({
+          id: client.id,
+          ...data,
+        }).unwrap();
         toast.success("Client updated successfully");
         router.push(`/dashboard/clients/${client.id}`);
       } else {
-        const newClientId = await createClient(data);
+        const result = await addClient(data).unwrap();
         toast.success("Client created successfully");
-        router.push(`/dashboard/clients/${newClientId}`);
+        if (result?.id) {
+          router.push(`/dashboard/clients/${result.id}`);
+        } else {
+          router.push("/dashboard/clients");
+        }
       }
     } catch (error) {
       console.error("Failed to save client:", error);
       toast.error("Failed to save client. Please try again.");
-    } finally {
-      setIsSubmitting(false);
     }
   }
 

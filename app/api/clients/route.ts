@@ -7,7 +7,6 @@ export async function GET(request: NextRequest) {
   const page = Number(searchParams.get("page") || "0");
   const pageSize = Number(searchParams.get("pageSize") || "10");
 
-  // Handle multi-column sorting
   const sorts = searchParams.getAll("sorts");
   const sortFields =
     sorts.length > 0
@@ -17,7 +16,6 @@ export async function GET(request: NextRequest) {
         })
       : [];
 
-  // Handle multi-column filtering
   const filters = searchParams.getAll("filters");
   const filterFields =
     filters.length > 0
@@ -28,15 +26,12 @@ export async function GET(request: NextRequest) {
       : [];
 
   try {
-    // Note: Updated getClients function to support multi-column filtering and sorting
     const clients = await tryCatch(
       () =>
         getClients({
           page,
           pageSize,
-          // Multi-column sorting
           sorts: sortFields,
-          // Multi-column filtering
           filters: filterFields,
         }),
       {

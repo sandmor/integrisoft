@@ -5,6 +5,7 @@ import { Mail, Phone, Plus, Trash, User } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Dialog,
   DialogContent,
@@ -26,7 +27,47 @@ import { Input } from "@/components/ui/input";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { addClientContact, deleteClientContact } from "@/lib/actions/clients";
+import { api } from "@/lib/redux/api";
+
+const clientContactsApi = api.injectEndpoints({
+  endpoints: (build) => ({
+    getClientContacts: build.query({
+      query: (clientId) => `/clients/${clientId}/contacts`,
+      providesTags: (result: ClientContact[] | undefined, error, clientId) =>
+        result
+          ? [
+              ...result.map(({ id }) => ({ type: "Clients" as const, id })),
+              { type: "Clients", id: clientId },
+            ]
+          : [{ type: "Clients", id: clientId }],
+    }),
+    addContact: build.mutation({
+      query: ({ clientId, ...data }) => ({
+        url: `/clients/${clientId}/contacts`,
+        method: "POST",
+        body: data,
+      }),
+      invalidatesTags: (result, error, { clientId }) => [
+        { type: "Clients", id: clientId },
+      ],
+    }),
+    deleteContact: build.mutation({
+      query: ({ contactId }) => ({
+        url: `/contacts/${contactId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (result, error, { clientId }) => [
+        { type: "Clients", id: clientId },
+      ],
+    }),
+  }),
+});
+
+export const {
+  useGetClientContactsQuery,
+  useAddContactMutation,
+  useDeleteContactMutation,
+} = clientContactsApi;
 
 type ClientContact = {
   id: string;
@@ -56,10 +97,23 @@ type ContactFormValues = z.infer<typeof contactFormSchema>;
 
 export function ClientContactsTab({
   clientId,
-  contacts,
+  contacts: initialContacts,
 }: ClientContactsTabProps) {
   const [isAddingContact, setIsAddingContact] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { data: reduxContacts, isLoading } = useGetClientContactsQuery(
+    clientId,
+    {
+      skip: initialContacts.length > 0,
+    }
+  );
+
+  const [addContact, { isLoading: isAddingContactLoading }] =
+    useAddContactMutation();
+  const [deleteContact, { isLoading: isDeletingContact }] =
+    useDeleteContactMutation();
+
+  const contacts = reduxContacts || initialContacts;
 
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(contactFormSchema),
@@ -74,23 +128,20 @@ export function ClientContactsTab({
   });
 
   async function onSubmit(data: ContactFormValues) {
-    setIsSubmitting(true);
     try {
-      await addClientContact(clientId, data);
+      await addContact({ clientId, ...data }).unwrap();
       toast.success("Contact added successfully");
       form.reset();
       setIsAddingContact(false);
     } catch (error) {
       console.error("Failed to add contact:", error);
       toast.error("Failed to add contact. Please try again.");
-    } finally {
-      setIsSubmitting(false);
     }
   }
 
   async function handleDeleteContact(contactId: string) {
     try {
-      await deleteClientContact(contactId);
+      await deleteContact({ contactId, clientId }).unwrap();
       toast.success("Contact deleted successfully");
     } catch (error) {
       console.error("Failed to delete contact:", error);
@@ -193,12 +244,12 @@ export function ClientContactsTab({
                     type="button"
                     variant="outline"
                     onClick={() => setIsAddingContact(false)}
-                    disabled={isSubmitting}
+                    disabled={isAddingContactLoading}
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? "Adding..." : "Add Contact"}
+                  <Button type="submit" disabled={isAddingContactLoading}>
+                    {isAddingContactLoading ? "Adding..." : "Add Contact"}
                   </Button>
                 </DialogFooter>
               </form>
@@ -207,7 +258,12 @@ export function ClientContactsTab({
         </Dialog>
       </div>
 
-      {contacts.length === 0 ? (
+      {isLoading ? (
+        <div className="flex justify-center items-center py-12">
+          <Spinner />
+          <span className="ml-3">Loading contacts...</span>
+        </div>
+      ) : contacts.length === 0 ? (
         <Card>
           <CardContent className="p-6 text-center text-muted-foreground">
             No contacts added yet. Add a contact to get started.
@@ -233,6 +289,7 @@ export function ClientContactsTab({
                     size="icon"
                     onClick={() => handleDeleteContact(contact.id)}
                     className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    disabled={isDeletingContact}
                   >
                     <Trash className="h-4 w-4" />
                   </Button>

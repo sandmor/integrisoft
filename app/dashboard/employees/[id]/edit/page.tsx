@@ -2,12 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
   getEmployee,
-  NewEmployeeData,
-  updateEmployee,
   getDepartments,
   getPositions,
-  Department,
-  Position,
 } from "@/lib/actions/employees";
 import { EmployeeForm } from "../../../../../components/dashboard/employees/employee-form";
 import { Button } from "@/components/ui/button";
@@ -27,25 +23,6 @@ export default async function EditEmployeePage({
 
   if (!employee) {
     notFound();
-  }
-
-  async function handleUpdateEmployee(data: NewEmployeeData) {
-    "use server";
-    try {
-      const result = await updateEmployee({
-        ...data,
-        id: employee!.id,
-      });
-
-      if (result.success) {
-        return {};
-      } else {
-        return { error: result.error || "Failed to update employee" };
-      }
-    } catch (error) {
-      console.error("Error updating employee:", error);
-      return { error: "An unexpected error occurred" };
-    }
   }
 
   return (
@@ -74,7 +51,6 @@ export default async function EditEmployeePage({
         initialData={employee}
         departments={departments}
         positions={positions}
-        onSubmit={handleUpdateEmployee}
         isEditing={true}
       />
     </div>

@@ -33,8 +33,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  useGetTeamMemberByIdQuery,
+  useAddTeamMemberMutation,
+  useUpdateTeamMemberMutation,
+} from "@/lib/redux/projectsApi";
 
-// Schema for form validation
 const teamMemberSchema = z.object({
   employeeId: z.string().min(1, "Employee is required"),
   role: z.string().min(1, "Role is required"),
@@ -46,7 +50,6 @@ const teamMemberSchema = z.object({
   endDate: z.date().nullable().optional(),
 });
 
-// Define the type for form values
 type TeamMemberFormValues = z.infer<typeof teamMemberSchema>;
 
 type Employee = {
@@ -62,7 +65,6 @@ type TeamMemberFormProps = {
   onSuccess: () => void;
 };
 
-// Helper function to convert employees to ComboboxOption format
 function employeesToOptions(employees: Employee[]): ComboboxOption[] {
   return employees.map((employee) => ({
     value: employee.id,
@@ -78,10 +80,20 @@ export function TeamMemberForm({
   onSuccess,
 }: TeamMemberFormProps) {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isFetching, setIsFetching] = useState(!!teamMemberId);
 
-  // Initialize the form with default values
+  const { data: teamMember, isLoading: isLoadingTeamMember } =
+    useGetTeamMemberByIdQuery(
+      { projectId, teamMemberId: teamMemberId || "" },
+      { skip: !teamMemberId }
+    );
+
+  const [addTeamMember, { isLoading: isAddingTeamMember }] =
+    useAddTeamMemberMutation();
+  const [updateTeamMember, { isLoading: isUpdatingTeamMember }] =
+    useUpdateTeamMemberMutation();
+
+  const isLoading = isAddingTeamMember || isUpdatingTeamMember;
+
   const form = useForm<TeamMemberFormValues>({
     resolver: zodResolver(teamMemberSchema),
     defaultValues: {
@@ -93,43 +105,20 @@ export function TeamMemberForm({
     },
   });
 
-  // If editing, fetch the existing team member data
   useEffect(() => {
-    if (teamMemberId) {
-      const fetchTeamMember = async () => {
-        try {
-          setIsFetching(true);
-          const response = await fetch(
-            `/api/projects/${projectId}/team-members/${teamMemberId}`
-          );
-          if (response.ok) {
-            const data = await response.json();
-            // Format dates for the form
-            form.reset({
-              employeeId: data.employeeId,
-              role: data.role,
-              allocationPercentage: data.allocationPercentage,
-              startDate: data.startDate ? new Date(data.startDate) : new Date(),
-              endDate: data.endDate ? new Date(data.endDate) : null,
-            });
-          } else {
-            toast.error("Failed to load team member data");
-            onClose();
-          }
-        } catch (error) {
-          console.error("Error fetching team member:", error);
-          toast.error("Failed to load team member data");
-          onClose();
-        } finally {
-          setIsFetching(false);
-        }
-      };
-
-      fetchTeamMember();
+    if (teamMember && teamMemberId) {
+      form.reset({
+        employeeId: teamMember.employeeId,
+        role: teamMember.role,
+        allocationPercentage: teamMember.allocationPercentage,
+        startDate: teamMember.startDate
+          ? new Date(teamMember.startDate)
+          : new Date(),
+        endDate: teamMember.endDate ? new Date(teamMember.endDate) : null,
+      });
     }
-  }, [teamMemberId, projectId, form, onClose]);
+  }, [teamMember, teamMemberId, form]);
 
-  // Common project roles for team members
   const roles = [
     "Developer",
     "Senior Developer",
@@ -156,44 +145,37 @@ export function TeamMemberForm({
 
   const onSubmit = async (values: TeamMemberFormValues) => {
     try {
-      setIsLoading(true);
+      const teamMemberData = {
+        ...values,
+        endDate: values.endDate === undefined ? null : values.endDate,
+      };
 
-      const url = teamMemberId
-        ? `/api/projects/${projectId}/team-members/${teamMemberId}`
-        : `/api/projects/${projectId}/team-members`;
+      if (teamMemberId) {
+        await updateTeamMember({
+          projectId,
+          teamMemberId,
+          teamMember: teamMemberData,
+        }).unwrap();
 
-      const method = teamMemberId ? "PATCH" : "POST";
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(values),
-      });
-
-      if (response.ok) {
-        toast.success(
-          teamMemberId
-            ? "Team member updated successfully"
-            : "Team member added successfully"
-        );
-        // Refresh the page data
-        router.refresh();
-        onSuccess();
+        toast.success("Team member updated successfully");
       } else {
-        const error = await response.json();
-        toast.error(error.error || "Failed to save team member");
+        await addTeamMember({
+          projectId,
+          teamMember: teamMemberData,
+        }).unwrap();
+
+        toast.success("Team member added successfully");
       }
+
+      router.refresh();
+      onSuccess();
     } catch (error) {
       console.error("Error saving team member:", error);
       toast.error("Failed to save team member");
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  if (isFetching) {
+  if (isLoadingTeamMember && teamMemberId) {
     return (
       <div className="flex justify-center items-center p-6">
         <Loader2 className="h-6 w-6 animate-spin" />
@@ -204,7 +186,6 @@ export function TeamMemberForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        {/* Employee Selection */}
         <FormField
           control={form.control}
           name="employeeId"
@@ -226,7 +207,6 @@ export function TeamMemberForm({
           )}
         />
 
-        {/* Role Selection */}
         <FormField
           control={form.control}
           name="role"
@@ -256,7 +236,6 @@ export function TeamMemberForm({
           )}
         />
 
-        {/* Allocation Percentage */}
         <FormField
           control={form.control}
           name="allocationPercentage"
@@ -278,7 +257,6 @@ export function TeamMemberForm({
           )}
         />
 
-        {/* Start Date */}
         <FormField
           control={form.control}
           name="startDate"
@@ -318,7 +296,6 @@ export function TeamMemberForm({
           )}
         />
 
-        {/* End Date */}
         <FormField
           control={form.control}
           name="endDate"
@@ -351,7 +328,6 @@ export function TeamMemberForm({
                     onSelect={field.onChange}
                     initialFocus
                     disabled={(date) => {
-                      // Disable dates before the start date
                       const startDate = form.getValues("startDate");
                       return startDate && date < startDate;
                     }}
@@ -363,7 +339,6 @@ export function TeamMemberForm({
           )}
         />
 
-        {/* Form Actions */}
         <div className="flex justify-end space-x-2">
           <Button
             type="button"

@@ -24,13 +24,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Employee,
-  CreateEmployeeData,
-  NewEmployeeData,
-  Department,
-  Position,
-} from "@/lib/actions/employees";
 import { toast } from "sonner";
 import {
   Select,
@@ -40,6 +33,12 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Combobox, ComboboxOption } from "@/components/ui/combobox";
+import {
+  useAddEmployeeMutation,
+  useUpdateEmployeeMutation,
+} from "@/lib/redux/employeesApi";
+
+import { Employee, Department, Position } from "@/lib/actions/employees";
 
 // Base validation schema for employee form (without password validation)
 const baseEmployeeSchema = z.object({
@@ -131,7 +130,6 @@ const newEmployeeSchema = z
     path: ["confirmPassword"],
   });
 
-// Create our own type based on the schema
 type EmployeeFormValues = z.infer<typeof baseEmployeeSchema>;
 type NewEmployeeFormValues = z.infer<typeof newEmployeeSchema>;
 
@@ -139,9 +137,6 @@ interface UnifiedEmployeeFormProps {
   initialData?: Employee;
   departments: Department[];
   positions: Position[];
-  onSubmit: (
-    data: CreateEmployeeData | NewEmployeeData
-  ) => Promise<{ error?: string } | void>;
   isSubmitting?: boolean;
   isEditing?: boolean;
 }
@@ -175,12 +170,18 @@ export function EmployeeForm({
   initialData,
   departments,
   positions,
-  onSubmit,
   isSubmitting = false,
   isEditing = false,
 }: UnifiedEmployeeFormProps) {
   const router = useRouter();
-  const [isSaving, setIsSaving] = useState(isSubmitting);
+
+  // RTK Query mutations
+  const [addEmployee, { isLoading: isCreating }] = useAddEmployeeMutation();
+  const [updateEmployee, { isLoading: isUpdating }] =
+    useUpdateEmployeeMutation();
+
+  const isSaving = isCreating || isUpdating || isSubmitting;
+
   const [departmentOptions, setDepartmentOptions] = useState<ComboboxOption[]>(
     []
   );
@@ -316,8 +317,6 @@ export function EmployeeForm({
     data: EmployeeFormValues | NewEmployeeFormValues
   ) {
     try {
-      setIsSaving(true);
-
       // Find department and position names from IDs
       const selectedDepartment = departments.find(
         (d) => d.id === data.departmentId
@@ -325,7 +324,7 @@ export function EmployeeForm({
       const selectedPosition = positions.find((p) => p.id === data.positionId);
 
       // Convert form data to expected format
-      const employeeData: CreateEmployeeData = {
+      const employeeData = {
         name: data.name,
         lastName: data.lastName,
         email: data.email,
@@ -339,12 +338,13 @@ export function EmployeeForm({
         role: data.role,
       };
 
-      const result = await onSubmit(employeeData);
-
-      // Check if there's an error returned from the server action
-      if (result && "error" in result) {
-        toast.error(result.error);
-        return;
+      if (isEditing && initialData) {
+        await updateEmployee({
+          id: initialData.id,
+          ...employeeData,
+        }).unwrap();
+      } else {
+        await addEmployee(employeeData).unwrap();
       }
 
       toast.success(
@@ -360,8 +360,6 @@ export function EmployeeForm({
           isEditing ? "updating" : "creating"
         } the employee data. Please try again.`
       );
-    } finally {
-      setIsSaving(false);
     }
   }
 

@@ -5,6 +5,7 @@ import { CalendarClock, MessageSquare, Plus, Trash, User } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Dialog,
   DialogContent,
@@ -29,10 +30,56 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { formatDate } from "@/lib/utils";
-import {
-  addClientInteraction,
-  deleteClientInteraction,
-} from "@/lib/actions/clients";
+import { api } from "@/lib/redux/api";
+
+const clientInteractionsApi = api.injectEndpoints({
+  endpoints: (build) => ({
+    getClientInteractions: build.query<ClientInteraction[], string>({
+      query: (clientId) => `/clients/${clientId}/interactions`,
+      providesTags: (result, error, clientId) =>
+        result
+          ? [
+              ...result.map(({ id }) => ({
+                type: "Clients" as const,
+                id,
+              })),
+              { type: "Clients", id: clientId },
+            ]
+          : [{ type: "Clients", id: clientId }],
+    }),
+    addInteraction: build.mutation<
+      ClientInteraction,
+      { clientId: string; [key: string]: any }
+    >({
+      query: ({ clientId, ...data }) => ({
+        url: `/clients/${clientId}/interactions`,
+        method: "POST",
+        body: data,
+      }),
+      invalidatesTags: (result, error, { clientId }) => [
+        { type: "Clients", id: clientId },
+      ],
+    }),
+    deleteInteraction: build.mutation<
+      void,
+      { interactionId: string; clientId: string }
+    >({
+      query: ({ interactionId }) => ({
+        url: `/interactions/${interactionId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (result, error, { clientId }) => [
+        { type: "Clients", id: clientId },
+      ],
+    }),
+  }),
+});
+
+export const {
+  useGetClientInteractionsQuery,
+  useAddInteractionMutation,
+  useDeleteInteractionMutation,
+} = clientInteractionsApi;
 
 type ClientContact = {
   id: string;
@@ -69,7 +116,6 @@ const interactionFormSchema = z.object({
 
 type InteractionFormValues = z.infer<typeof interactionFormSchema>;
 
-// Helper to convert contacts to combobox options
 function contactsToOptions(contacts: ClientContact[]): ComboboxOption[] {
   return [
     { value: "", label: "No specific contact" },
@@ -80,7 +126,6 @@ function contactsToOptions(contacts: ClientContact[]): ComboboxOption[] {
   ];
 }
 
-// Helper to convert interaction types to combobox options
 function interactionTypesToOptions(
   types: { value: string; label: string }[]
 ): ComboboxOption[] {
@@ -92,12 +137,25 @@ function interactionTypesToOptions(
 
 export function ClientInteractionsTab({
   clientId,
-  interactions,
+  interactions: initialInteractions,
   contacts,
 }: ClientInteractionsTabProps) {
   const [isAddingInteraction, setIsAddingInteraction] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const contactOptions = contactsToOptions(contacts);
+
+  const { data: reduxInteractions, isLoading } = useGetClientInteractionsQuery(
+    clientId,
+    {
+      skip: initialInteractions.length > 0,
+    }
+  );
+
+  const [addInteraction, { isLoading: isAddingInteractionLoading }] =
+    useAddInteractionMutation();
+  const [deleteInteraction, { isLoading: isDeletingInteraction }] =
+    useDeleteInteractionMutation();
+
+  const interactions = reduxInteractions || initialInteractions;
 
   const interactionTypes = [
     { value: "meeting", label: "Meeting" },
@@ -124,23 +182,20 @@ export function ClientInteractionsTab({
   });
 
   async function onSubmit(data: InteractionFormValues) {
-    setIsSubmitting(true);
     try {
-      await addClientInteraction(clientId, data);
+      await addInteraction({ clientId, ...data }).unwrap();
       toast.success("Interaction added successfully");
       form.reset();
       setIsAddingInteraction(false);
     } catch (error) {
       console.error("Failed to add interaction:", error);
       toast.error("Failed to add interaction. Please try again.");
-    } finally {
-      setIsSubmitting(false);
     }
   }
 
   async function handleDeleteInteraction(interactionId: string) {
     try {
-      await deleteClientInteraction(interactionId);
+      await deleteInteraction({ interactionId, clientId }).unwrap();
       toast.success("Interaction deleted successfully");
     } catch (error) {
       console.error("Failed to delete interaction:", error);
@@ -148,7 +203,6 @@ export function ClientInteractionsTab({
     }
   }
 
-  // Format interaction type for display
   const formatType = (type: string) => {
     return type.charAt(0).toUpperCase() + type.slice(1);
   };
@@ -285,12 +339,14 @@ export function ClientInteractionsTab({
                     type="button"
                     variant="outline"
                     onClick={() => setIsAddingInteraction(false)}
-                    disabled={isSubmitting}
+                    disabled={isAddingInteractionLoading}
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? "Adding..." : "Add Interaction"}
+                  <Button type="submit" disabled={isAddingInteractionLoading}>
+                    {isAddingInteractionLoading
+                      ? "Adding..."
+                      : "Add Interaction"}
                   </Button>
                 </DialogFooter>
               </form>
@@ -299,7 +355,12 @@ export function ClientInteractionsTab({
         </Dialog>
       </div>
 
-      {interactions.length === 0 ? (
+      {isLoading ? (
+        <div className="flex justify-center items-center py-12">
+          <Spinner />
+          <span className="ml-3">Loading interactions...</span>
+        </div>
+      ) : interactions.length === 0 ? (
         <Card>
           <CardContent className="p-6 text-center text-muted-foreground">
             No interactions recorded yet. Add an interaction to start tracking
@@ -326,6 +387,7 @@ export function ClientInteractionsTab({
                     size="icon"
                     onClick={() => handleDeleteInteraction(interaction.id)}
                     className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    disabled={isDeletingInteraction}
                   >
                     <Trash className="h-4 w-4" />
                   </Button>

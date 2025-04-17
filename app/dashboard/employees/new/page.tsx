@@ -1,10 +1,5 @@
 import Link from "next/link";
-import {
-  createEmployee,
-  getDepartments,
-  getPositions,
-  type CreateEmployeeData,
-} from "@/lib/actions/employees";
+import { getDepartments, getPositions } from "@/lib/actions/employees";
 import { EmployeeForm } from "@/components/dashboard/employees/employee-form";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
@@ -15,24 +10,6 @@ export default async function NewEmployeePage() {
     getDepartments(),
     getPositions(),
   ]);
-
-  async function handleCreateEmployee(data: any) {
-    "use server";
-
-    const employeeData: CreateEmployeeData = data as CreateEmployeeData;
-    try {
-      const result = await createEmployee(employeeData);
-
-      if (result.success) {
-        return {};
-      } else {
-        return { error: result.error || "Failed to create employee" };
-      }
-    } catch (error) {
-      console.error("Error creating employee:", error);
-      return { error: "An unexpected error occurred" };
-    }
-  }
 
   return (
     <div className="space-y-6">
@@ -58,7 +35,6 @@ export default async function NewEmployeePage() {
       <EmployeeForm
         departments={departments}
         positions={positions}
-        onSubmit={handleCreateEmployee}
         isEditing={false}
       />
     </div>

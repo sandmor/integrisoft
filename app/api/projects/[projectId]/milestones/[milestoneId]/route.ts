@@ -112,7 +112,7 @@ export async function PATCH(
 // DELETE /api/projects/[projectId]/milestones/[milestoneId] - Delete a milestone (soft delete)
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { projectId: string; milestoneId: string } }
+  { params }: { params: Promise<{ projectId: string; milestoneId: string }> }
 ) {
   try {
     const session = await auth.api.getSession({
@@ -122,8 +122,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const projectId = params.projectId;
-    const milestoneId = params.milestoneId;
+    const { projectId, milestoneId } = await params;
 
     // Check if milestone exists
     const [existingMilestone] = await db

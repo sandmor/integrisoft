@@ -26,6 +26,11 @@ import {
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  useAddMilestoneMutation,
+  useUpdateMilestoneMutation,
+} from "@/lib/redux/projectsApi";
+import { toast } from "sonner";
 
 // Schema for milestone form validation
 const milestoneSchema = z.object({
@@ -36,14 +41,7 @@ const milestoneSchema = z.object({
   completedDate: z.date().optional().nullable(),
 });
 
-// Define types
 type MilestoneFormValues = z.infer<typeof milestoneSchema>;
-
-// Helper function to format date for API
-const formatDateForApi = (date: Date | null | undefined) => {
-  if (!date) return null;
-  return format(date, "yyyy-MM-dd");
-};
 
 type MilestoneFormProps = {
   projectId: string;
@@ -59,9 +57,15 @@ export function MilestoneForm({
   onSuccess,
 }: MilestoneFormProps) {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
 
-  // Initialize form with default values or empty values
+  const [addMilestone, { isLoading: isAddLoading, error: addError }] =
+    useAddMilestoneMutation();
+  const [updateMilestone, { isLoading: isUpdateLoading, error: updateError }] =
+    useUpdateMilestoneMutation();
+
+  const isLoading = isAddLoading || isUpdateLoading;
+  const error = addError || updateError;
+
   const form = useForm<MilestoneFormValues>({
     resolver: zodResolver(milestoneSchema),
     defaultValues: defaultValues || {
@@ -73,39 +77,33 @@ export function MilestoneForm({
     },
   });
 
-  // Form submission handler
   const onSubmit = async (values: MilestoneFormValues) => {
-    setIsLoading(true);
     try {
-      // Format the values for API
-      const formattedValues = {
-        ...values,
-        dueDate: formatDateForApi(values.dueDate),
-        completedDate: values.isCompleted
-          ? formatDateForApi(values.completedDate || new Date())
-          : null,
+      const milestone = {
+        name: values.name,
+        description: values.description ?? null,
+        dueDate: values.dueDate,
+        isCompleted: values.isCompleted,
+        completedDate: values.completedDate ?? null,
       };
 
-      const url = milestoneId
-        ? `/api/projects/${projectId}/milestones/${milestoneId}`
-        : `/api/projects/${projectId}/milestones`;
-
-      const method = milestoneId ? "PATCH" : "POST";
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formattedValues),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Failed to save milestone");
+      if (milestoneId) {
+        // Update existing milestone
+        await updateMilestone({
+          projectId,
+          milestoneId,
+          milestone: milestone,
+        }).unwrap();
+        toast.success("Milestone updated successfully");
+      } else {
+        // Create new milestone
+        await addMilestone({
+          projectId,
+          milestone: milestone,
+        }).unwrap();
+        toast.success("Milestone created successfully");
       }
 
-      // Call the onSuccess callback if provided
       if (onSuccess) {
         onSuccess();
       } else {
@@ -115,8 +113,9 @@ export function MilestoneForm({
       }
     } catch (error) {
       console.error("Error saving milestone:", error);
-    } finally {
-      setIsLoading(false);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to save milestone"
+      );
     }
   };
 
@@ -276,6 +275,13 @@ export function MilestoneForm({
             />
           )}
         </div>
+
+        {/* Error message display */}
+        {error && (
+          <div className="text-red-600 text-sm">
+            {error instanceof Error ? error.message : "An error occurred"}
+          </div>
+        )}
 
         {/* Form Actions */}
         <div className="flex justify-end space-x-4">

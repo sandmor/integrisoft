@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { CalendarDays, FileBox, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import {
   Card,
   CardContent,
@@ -13,16 +13,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils";
-
-type Project = {
-  id: string;
-  name: string;
-  description: string | null;
-  status: string;
-  startDate: Date | null;
-  targetEndDate: Date | null;
-  manager: { id: string | null; name: string | null } | null;
-};
+import { useGetProjectsByClientQuery } from "@/lib/redux/projectsApi";
+import type { Project } from "@/lib/redux/projectsApi";
 
 interface ClientProjectsTabProps {
   clientId: string;
@@ -31,9 +23,8 @@ interface ClientProjectsTabProps {
 
 export function ClientProjectsTab({
   clientId,
-  projects,
+  projects: initialProjects,
 }: ClientProjectsTabProps) {
-  // Status color mapping
   const statusColors: Record<string, string> = {
     planning: "bg-blue-100 text-blue-800",
     active: "bg-green-100 text-green-800",
@@ -42,7 +33,15 @@ export function ClientProjectsTab({
     cancelled: "bg-red-100 text-red-800",
   };
 
-  // Format status for display
+  const { data: paginatedData, isLoading } = useGetProjectsByClientQuery(
+    clientId,
+    {
+      skip: initialProjects.length > 0,
+    }
+  );
+
+  const projects = paginatedData?.data || initialProjects;
+
   const formatStatus = (status: string) => {
     return status
       .replace("_", " ")
@@ -61,7 +60,12 @@ export function ClientProjectsTab({
         </Button>
       </div>
 
-      {projects.length === 0 ? (
+      {isLoading ? (
+        <div className="flex justify-center items-center py-12">
+          <Spinner />
+          <span className="ml-3">Loading projects...</span>
+        </div>
+      ) : projects.length === 0 ? (
         <Card>
           <CardContent className="p-6 text-center text-muted-foreground">
             No projects for this client yet. Create a new project to get

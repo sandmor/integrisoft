@@ -309,7 +309,7 @@ export async function generateMilestones(
           );
         }
       } else if (dueDate < new Date()) {
-        // For active/on-hold projects, complete milestones that are past due
+        // For active/on_hold projects, complete milestones that are past due
         // 80% chance of completion for past due milestones
         isCompleted = Math.random() < 0.8;
         if (isCompleted) {

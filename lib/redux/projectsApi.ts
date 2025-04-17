@@ -1,6 +1,13 @@
 import { api } from "./api";
 
-// Serialized interfaces for Redux store
+// Helper type for handling model updates with proper date typing
+type TypeSafeUpdate<T> = {
+  [K in keyof T]?: T[K] extends Date | null | undefined
+    ? Date | null | undefined
+    : T[K];
+};
+
+// Interfaces for Redux store
 export interface SerializedProject
   extends Omit<
     Project,
@@ -31,6 +38,18 @@ export interface SerializedMilestone
   extends Omit<Milestone, "dueDate" | "completedDate"> {
   dueDate: string | null;
   completedDate: string | null;
+}
+
+export interface SerializedTask
+  extends Omit<
+    Task,
+    "dueDate" | "startDate" | "completedDate" | "createdAt" | "updatedAt"
+  > {
+  dueDate: string | null;
+  startDate: string | null;
+  completedDate: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Project {
@@ -88,6 +107,41 @@ export interface Milestone {
   dueDate: Date | null;
   completedDate: Date | null;
   isCompleted: boolean;
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  description?: string | null;
+  status: "todo" | "in_progress" | "review" | "done";
+  priority: 1 | 2 | 3; // 1: Low, 2: Medium, 3: High
+  dueDate?: Date | null;
+  startDate?: Date | null;
+  estimatedHours?: number | null;
+  actualHours?: number | null;
+  completedDate?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  projectId: string;
+  assignedToId?: string | null;
+  milestoneId?: string | null;
+  assignee?: {
+    id: string;
+    name: string;
+  } | null;
+  milestone?: {
+    id: string;
+    name: string;
+  } | null;
+}
+
+export interface TaskResponse {
+  data: Task;
+}
+
+export interface TasksResponse {
+  data: Task[];
+  count: number;
 }
 
 export const projectsApi = api.injectEndpoints({
@@ -185,6 +239,7 @@ export const projectsApi = api.injectEndpoints({
           updatedAt: new Date().toJSON(),
         } as unknown as Project;
 
+        // Add to projects list
         const patchResult = dispatch(
           projectsApi.util.updateQueryData("getProjects", {}, (draft) => {
             draft.data.unshift(optimisticProject);
@@ -192,6 +247,7 @@ export const projectsApi = api.injectEndpoints({
           })
         );
 
+        // Add to client projects list
         let clientPatchResult;
         if (newProject.clientId) {
           clientPatchResult = dispatch(
@@ -218,6 +274,7 @@ export const projectsApi = api.injectEndpoints({
             updatedAt: createdProject.updatedAt?.toJSON(),
           } as unknown as Project;
 
+          // Replace optimistic entry with actual data
           dispatch(
             projectsApi.util.updateQueryData("getProjects", {}, (draft) => {
               const index = draft.data.findIndex(
@@ -267,6 +324,7 @@ export const projectsApi = api.injectEndpoints({
           updatedAt: new Date().toJSON(),
         } as unknown as Project;
 
+        // Update projects list
         const listPatch = dispatch(
           projectsApi.util.updateQueryData("getProjects", {}, (draft) => {
             const index = draft.data.findIndex(
@@ -280,6 +338,7 @@ export const projectsApi = api.injectEndpoints({
           })
         );
 
+        // Update project details
         const detailPatch = dispatch(
           projectsApi.util.updateQueryData(
             "getProjectById",
@@ -290,6 +349,7 @@ export const projectsApi = api.injectEndpoints({
           )
         );
 
+        // Update client's projects list
         let clientPatch;
         if (updatedProject.clientId) {
           clientPatch = dispatch(
@@ -334,6 +394,7 @@ export const projectsApi = api.injectEndpoints({
         const projectsQueries = state.api.queries;
         let clientId;
 
+        // Find client ID for the project
         Object.values(projectsQueries).forEach((query: any) => {
           if (query?.data?.data && Array.isArray(query.data.data)) {
             const project = query.data.data.find((p: any) => p.id === id);
@@ -343,6 +404,7 @@ export const projectsApi = api.injectEndpoints({
           }
         });
 
+        // Remove project from projects list
         const listPatch = dispatch(
           projectsApi.util.updateQueryData("getProjects", {}, (draft) => {
             const index = draft.data.findIndex((project) => project.id === id);
@@ -353,6 +415,7 @@ export const projectsApi = api.injectEndpoints({
           })
         );
 
+        // Remove project from client projects list
         let clientListPatch;
         if (clientId) {
           clientListPatch = dispatch(
@@ -374,6 +437,7 @@ export const projectsApi = api.injectEndpoints({
 
         try {
           await queryFulfilled;
+          // Remove project detail
           dispatch(
             projectsApi.util.updateQueryData(
               "getProjectById",
@@ -439,6 +503,7 @@ export const projectsApi = api.injectEndpoints({
           name: "Loading...",
         } as unknown as TeamMember;
 
+        // Add team member to list
         const teamMembersPatch = dispatch(
           projectsApi.util.updateQueryData(
             "getTeamMembers",
@@ -449,6 +514,7 @@ export const projectsApi = api.injectEndpoints({
           )
         );
 
+        // Add team member to project
         const projectPatch = dispatch(
           projectsApi.util.updateQueryData(
             "getProjectById",
@@ -466,6 +532,7 @@ export const projectsApi = api.injectEndpoints({
         try {
           const { data: createdTeamMember } = await queryFulfilled;
 
+          // Replace with actual data
           const serializedResponse = {
             ...createdTeamMember,
             startDate: createdTeamMember.startDate?.toJSON() || null,
@@ -534,6 +601,7 @@ export const projectsApi = api.injectEndpoints({
           endDate: teamMember.endDate?.toJSON() || null,
         };
 
+        // Update team members list
         const teamMembersPatch = dispatch(
           projectsApi.util.updateQueryData(
             "getTeamMembers",
@@ -543,18 +611,18 @@ export const projectsApi = api.injectEndpoints({
                 (member) => member.id === teamMemberId
               );
               if (index !== -1) {
-                const updatedMember = {
+                draft[index] = {
                   ...draft[index],
                   ...teamMember,
                   startDate: serializedTeamMember.startDate as unknown as Date,
                   endDate: serializedTeamMember.endDate as unknown as Date,
                 };
-                draft[index] = updatedMember;
               }
             }
           )
         );
 
+        // Update team member detail
         const teamMemberPatch = dispatch(
           projectsApi.util.updateQueryData(
             "getTeamMemberById",
@@ -570,6 +638,7 @@ export const projectsApi = api.injectEndpoints({
           )
         );
 
+        // Update team member in project
         const projectPatch = dispatch(
           projectsApi.util.updateQueryData(
             "getProjectById",
@@ -580,14 +649,13 @@ export const projectsApi = api.injectEndpoints({
                   (member) => member.id === teamMemberId
                 );
                 if (index !== -1) {
-                  const updatedMember = {
+                  draft.teamMembers[index] = {
                     ...draft.teamMembers[index],
                     ...teamMember,
                     startDate:
                       serializedTeamMember.startDate as unknown as Date,
                     endDate: serializedTeamMember.endDate as unknown as Date,
                   };
-                  draft.teamMembers[index] = updatedMember;
                 }
               }
             }
@@ -620,6 +688,7 @@ export const projectsApi = api.injectEndpoints({
         { projectId, teamMemberId },
         { dispatch, queryFulfilled }
       ) => {
+        // Remove from team members list
         const teamMembersPatch = dispatch(
           projectsApi.util.updateQueryData(
             "getTeamMembers",
@@ -633,6 +702,7 @@ export const projectsApi = api.injectEndpoints({
           )
         );
 
+        // Remove from project
         const projectPatch = dispatch(
           projectsApi.util.updateQueryData(
             "getProjectById",
@@ -650,6 +720,7 @@ export const projectsApi = api.injectEndpoints({
 
         try {
           await queryFulfilled;
+          // Remove team member detail
           dispatch(
             projectsApi.util.updateQueryData(
               "getTeamMemberById",
@@ -708,6 +779,7 @@ export const projectsApi = api.injectEndpoints({
       ) => {
         const tempId = Date.now().toString();
 
+        // Create optimistic milestone
         const optimisticMilestone = {
           ...milestone,
           id: tempId,
@@ -715,6 +787,7 @@ export const projectsApi = api.injectEndpoints({
           completedDate: milestone.completedDate?.toJSON() || null,
         } as unknown as Milestone;
 
+        // Add to milestones list
         const milestonesPatch = dispatch(
           projectsApi.util.updateQueryData(
             "getMilestones",
@@ -725,6 +798,7 @@ export const projectsApi = api.injectEndpoints({
           )
         );
 
+        // Add to project
         const projectPatch = dispatch(
           projectsApi.util.updateQueryData(
             "getProjectById",
@@ -742,6 +816,7 @@ export const projectsApi = api.injectEndpoints({
         try {
           const { data: createdMilestone } = await queryFulfilled;
 
+          // Replace with actual data
           const serializedMilestone = {
             ...createdMilestone,
             dueDate: createdMilestone.dueDate?.toJSON() || null,
@@ -808,12 +883,12 @@ export const projectsApi = api.injectEndpoints({
           id: milestoneId,
           dueDate: milestone.dueDate?.toJSON() || null,
           completedDate: milestone.completedDate?.toJSON() || null,
-          name: "",
-          description: null,
-          isCompleted: false,
-          ...milestone,
+          name: milestone.name || "",
+          description: milestone.description || null,
+          isCompleted: milestone.isCompleted ?? false,
         };
 
+        // Update milestones list
         const milestonesPatch = dispatch(
           projectsApi.util.updateQueryData(
             "getMilestones",
@@ -821,19 +896,19 @@ export const projectsApi = api.injectEndpoints({
             (draft) => {
               const index = draft.findIndex((item) => item.id === milestoneId);
               if (index !== -1) {
-                const updatedMilestone = {
+                draft[index] = {
                   ...draft[index],
                   ...milestone,
                   dueDate: serializedMilestone.dueDate as unknown as Date,
                   completedDate:
                     serializedMilestone.completedDate as unknown as Date,
                 };
-                draft[index] = updatedMilestone;
               }
             }
           )
         );
 
+        // Update milestone detail
         const milestonePatch = dispatch(
           projectsApi.util.updateQueryData(
             "getMilestoneById",
@@ -850,6 +925,7 @@ export const projectsApi = api.injectEndpoints({
           )
         );
 
+        // Update project milestone
         const projectPatch = dispatch(
           projectsApi.util.updateQueryData(
             "getProjectById",
@@ -860,14 +936,13 @@ export const projectsApi = api.injectEndpoints({
                   (item) => item.id === milestoneId
                 );
                 if (index !== -1) {
-                  const updatedMilestone = {
+                  draft.milestones[index] = {
                     ...draft.milestones[index],
                     ...milestone,
                     dueDate: serializedMilestone.dueDate as unknown as Date,
                     completedDate:
                       serializedMilestone.completedDate as unknown as Date,
                   };
-                  draft.milestones[index] = updatedMilestone;
                 }
               }
             }
@@ -901,6 +976,7 @@ export const projectsApi = api.injectEndpoints({
         { projectId, milestoneId },
         { dispatch, queryFulfilled }
       ) => {
+        // Remove from milestones list
         const milestonesPatch = dispatch(
           projectsApi.util.updateQueryData(
             "getMilestones",
@@ -912,6 +988,7 @@ export const projectsApi = api.injectEndpoints({
           )
         );
 
+        // Remove from project
         const projectPatch = dispatch(
           projectsApi.util.updateQueryData(
             "getProjectById",
@@ -929,6 +1006,7 @@ export const projectsApi = api.injectEndpoints({
 
         try {
           await queryFulfilled;
+          // Remove milestone detail
           dispatch(
             projectsApi.util.updateQueryData(
               "getMilestoneById",
@@ -939,6 +1017,226 @@ export const projectsApi = api.injectEndpoints({
         } catch {
           milestonesPatch.undo();
           projectPatch.undo();
+        }
+      },
+    }),
+
+    // Tasks endpoints
+    getTasks: build.query<TasksResponse, string>({
+      query: (projectId) => `/projects/${projectId}/tasks`,
+      providesTags: (result, error, projectId) =>
+        result
+          ? [
+              ...result.data.map(({ id }) => ({
+                type: "Projects" as const,
+                id: `task-${id}`,
+              })),
+              { type: "Projects", id: `tasks-${projectId}` },
+            ]
+          : [{ type: "Projects", id: `tasks-${projectId}` }],
+      keepUnusedDataFor: 60,
+    }),
+
+    getTask: build.query<TaskResponse, { projectId: string; taskId: string }>({
+      query: ({ projectId, taskId }) =>
+        `/projects/${projectId}/tasks/${taskId}`,
+      providesTags: (result, error, { taskId }) => [
+        { type: "Projects", id: `task-${taskId}` },
+      ],
+    }),
+
+    createTask: build.mutation<
+      Task,
+      {
+        projectId: string;
+        task: TypeSafeUpdate<
+          Omit<Task, "id" | "projectId" | "createdAt" | "updatedAt">
+        >;
+      }
+    >({
+      query: ({ projectId, task }) => ({
+        url: `/projects/${projectId}/tasks`,
+        method: "POST",
+        body: task,
+      }),
+      invalidatesTags: (result, error, { projectId }) => [
+        { type: "Projects", id: `tasks-${projectId}` },
+        { type: "Projects", id: projectId },
+      ],
+      onQueryStarted: async (
+        { projectId, task },
+        { dispatch, queryFulfilled }
+      ) => {
+        const tempId = Date.now().toString();
+
+        // Create optimistic task
+        const optimisticTask = {
+          id: tempId,
+          title: task.title || "New Task",
+          description: task.description || null,
+          status: task.status || "todo",
+          priority: task.priority || 2,
+          dueDate: task.dueDate || null,
+          startDate: task.startDate || null,
+          estimatedHours: task.estimatedHours || null,
+          actualHours: task.actualHours || null,
+          completedDate: task.completedDate || null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          projectId,
+          assignedToId: task.assignedToId || null,
+          milestoneId: task.milestoneId || null,
+          assignee: task.assignedToId
+            ? { id: task.assignedToId, name: "Loading..." }
+            : null,
+          milestone: task.milestoneId
+            ? { id: task.milestoneId, name: "Loading..." }
+            : null,
+        } as Task;
+
+        // Add to tasks list
+        const patchResult = dispatch(
+          projectsApi.util.updateQueryData("getTasks", projectId, (draft) => {
+            draft.data.unshift(optimisticTask);
+            draft.count = (draft.count || 0) + 1;
+          })
+        );
+
+        try {
+          const { data: createdTask } = await queryFulfilled;
+
+          // Replace with actual data
+          dispatch(
+            projectsApi.util.updateQueryData("getTasks", projectId, (draft) => {
+              const index = draft.data.findIndex((t) => t.id === tempId);
+              if (index !== -1) {
+                draft.data[index] = createdTask;
+              }
+            })
+          );
+        } catch {
+          patchResult.undo();
+        }
+      },
+    }),
+
+    updateTask: build.mutation<
+      Task,
+      {
+        projectId: string;
+        taskId: string;
+        task: TypeSafeUpdate<
+          Omit<Task, "id" | "projectId" | "createdAt" | "updatedAt">
+        >;
+      }
+    >({
+      query: ({ projectId, taskId, task }) => ({
+        url: `/projects/${projectId}/tasks/${taskId}`,
+        method: "PATCH",
+        body: task,
+      }),
+      invalidatesTags: (result, error, { projectId, taskId }) => [
+        { type: "Projects", id: `task-${taskId}` },
+        { type: "Projects", id: `tasks-${projectId}` },
+        { type: "Projects", id: projectId },
+      ],
+      onQueryStarted: async (
+        { projectId, taskId, task },
+        { dispatch, queryFulfilled }
+      ) => {
+        // Serialize dates for Redux
+        const serializedTask = {
+          ...task,
+          dueDate: task.dueDate?.toJSON() || null,
+          startDate: task.startDate?.toJSON() || null,
+          completedDate: task.completedDate?.toJSON() || null,
+          updatedAt: new Date().toJSON(),
+        } as SerializedTask;
+
+        // Update tasks list
+        const listPatch = dispatch(
+          projectsApi.util.updateQueryData("getTasks", projectId, (draft) => {
+            const index = draft.data.findIndex((t) => t.id === taskId);
+            if (index !== -1) {
+              draft.data[index] = {
+                ...draft.data[index],
+                ...task,
+                dueDate: serializedTask.dueDate as unknown as Date,
+                startDate: serializedTask.startDate as unknown as Date,
+                completedDate: serializedTask.completedDate as unknown as Date,
+                updatedAt: serializedTask.updatedAt as unknown as Date,
+              };
+            }
+          })
+        );
+
+        // Update task detail
+        const detailPatch = dispatch(
+          projectsApi.util.updateQueryData(
+            "getTask",
+            { projectId, taskId },
+            (draft) => {
+              if (draft.data) {
+                draft.data = {
+                  ...draft.data,
+                  ...task,
+                  dueDate: serializedTask.dueDate as unknown as Date,
+                  startDate: serializedTask.startDate as unknown as Date,
+                  completedDate:
+                    serializedTask.completedDate as unknown as Date,
+                  updatedAt: serializedTask.updatedAt as unknown as Date,
+                };
+              }
+            }
+          )
+        );
+
+        try {
+          await queryFulfilled;
+        } catch {
+          listPatch.undo();
+          detailPatch.undo();
+        }
+      },
+    }),
+
+    deleteTask: build.mutation<void, { projectId: string; taskId: string }>({
+      query: ({ projectId, taskId }) => ({
+        url: `/projects/${projectId}/tasks/${taskId}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: (result, error, { projectId, taskId }) => [
+        { type: "Projects", id: `task-${taskId}` },
+        { type: "Projects", id: `tasks-${projectId}` },
+        { type: "Projects", id: projectId },
+      ],
+      onQueryStarted: async (
+        { projectId, taskId },
+        { dispatch, queryFulfilled }
+      ) => {
+        // Remove from tasks list
+        const listPatch = dispatch(
+          projectsApi.util.updateQueryData("getTasks", projectId, (draft) => {
+            const index = draft.data.findIndex((t) => t.id === taskId);
+            if (index !== -1) {
+              draft.data.splice(index, 1);
+              draft.count = Math.max(0, (draft.count || 0) - 1);
+            }
+          })
+        );
+
+        try {
+          await queryFulfilled;
+          // Remove task detail
+          dispatch(
+            projectsApi.util.updateQueryData(
+              "getTask",
+              { projectId, taskId },
+              () => undefined as any
+            )
+          );
+        } catch {
+          listPatch.undo();
         }
       },
     }),
@@ -963,4 +1261,9 @@ export const {
   useAddMilestoneMutation,
   useUpdateMilestoneMutation,
   useDeleteMilestoneMutation,
+  useGetTasksQuery,
+  useGetTaskQuery,
+  useCreateTaskMutation,
+  useUpdateTaskMutation,
+  useDeleteTaskMutation,
 } = projectsApi;

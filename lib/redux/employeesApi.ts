@@ -1,6 +1,11 @@
 import { api } from "@/lib/redux/api";
 
-// Serialized interface for Redux store
+type TypeSafeUpdate<T> = {
+  [K in keyof T]?: T[K] extends Date | null | undefined
+    ? Date | null | undefined
+    : T[K];
+};
+
 export interface SerializedEmployee
   extends Omit<Employee, "hireDate" | "createdAt" | "updatedAt"> {
   hireDate: string;
@@ -89,7 +94,10 @@ export const employeesApi = api.injectEndpoints({
       providesTags: (_, __, id) => [{ type: "Employees", id }],
     }),
 
-    addEmployee: build.mutation<Employee, Partial<Employee>>({
+    addEmployee: build.mutation<
+      Employee,
+      TypeSafeUpdate<Omit<Employee, "id" | "createdAt" | "updatedAt">>
+    >({
       query: (body) => ({
         url: "/employees",
         method: "POST",
@@ -98,14 +106,18 @@ export const employeesApi = api.injectEndpoints({
       invalidatesTags: [{ type: "Employees", id: "LIST" }],
       onQueryStarted: async (newEmployee, { dispatch, queryFulfilled }) => {
         const tempId = Date.now().toString();
+        const hireDate =
+          newEmployee.hireDate instanceof Date
+            ? newEmployee.hireDate
+            : new Date();
 
         const optimisticEmployee = {
           ...newEmployee,
           id: tempId,
-          hireDate: newEmployee.hireDate?.toJSON(),
-          createdAt: new Date().toJSON(),
-          updatedAt: new Date().toJSON(),
-        } as unknown as Employee;
+          hireDate,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as Employee;
 
         const patchResult = dispatch(
           employeesApi.util.updateQueryData("getEmployees", {}, (draft) => {
@@ -117,19 +129,12 @@ export const employeesApi = api.injectEndpoints({
         try {
           const { data: createdEmployee } = await queryFulfilled;
 
-          const serializedEmployee = {
-            ...createdEmployee,
-            hireDate: createdEmployee.hireDate?.toJSON(),
-            createdAt: createdEmployee.createdAt?.toJSON(),
-            updatedAt: createdEmployee.updatedAt?.toJSON(),
-          } as unknown as Employee;
-
           dispatch(
             employeesApi.util.updateQueryData("getEmployees", {}, (draft) => {
               const index = draft.data.findIndex(
                 (employee) => employee.id === tempId
               );
-              if (index !== -1) draft.data[index] = serializedEmployee;
+              if (index !== -1) draft.data[index] = createdEmployee;
             })
           );
         } catch {
@@ -140,45 +145,67 @@ export const employeesApi = api.injectEndpoints({
 
     updateEmployee: build.mutation<
       Employee,
-      Partial<Employee> & { id: string }
+      {
+        id: string;
+        employee: TypeSafeUpdate<
+          Omit<Employee, "id" | "createdAt" | "updatedAt">
+        >;
+      }
     >({
-      query: ({ id, ...body }) => ({
+      query: ({ id, employee }) => ({
         url: `/employees/${id}`,
         method: "PATCH",
-        body,
+        body: employee,
       }),
       invalidatesTags: (_, __, arg) => [
         { type: "Employees", id: arg.id },
         { type: "Employees", id: "LIST" },
       ],
-      onQueryStarted: async (updatedEmployee, { dispatch, queryFulfilled }) => {
-        const serializedEmployee = {
-          ...updatedEmployee,
-          hireDate: updatedEmployee.hireDate?.toJSON(),
-          updatedAt: new Date().toJSON(),
-        } as unknown as Employee;
+      onQueryStarted: async (
+        { id, employee },
+        { dispatch, queryFulfilled }
+      ) => {
+        const safeUpdate = {
+          ...employee,
+          updatedAt: new Date(),
+          hireDate:
+            employee.hireDate !== undefined
+              ? employee.hireDate || new Date()
+              : undefined,
+        };
 
         const listPatch = dispatch(
           employeesApi.util.updateQueryData("getEmployees", {}, (draft) => {
-            const index = draft.data.findIndex(
-              (employee) => employee.id === updatedEmployee.id
-            );
-            if (index !== -1)
-              draft.data[index] = {
+            const index = draft.data.findIndex((e) => e.id === id);
+            if (index !== -1) {
+              const updatedEmployee = {
                 ...draft.data[index],
-                ...serializedEmployee,
+                ...safeUpdate,
+                hireDate:
+                  safeUpdate.hireDate instanceof Date
+                    ? safeUpdate.hireDate
+                    : safeUpdate.hireDate
+                    ? new Date(safeUpdate.hireDate)
+                    : draft.data[index].hireDate,
               };
+              draft.data[index] = updatedEmployee;
+            }
           })
         );
 
         const detailPatch = dispatch(
-          employeesApi.util.updateQueryData(
-            "getEmployeeById",
-            updatedEmployee.id,
-            (draft) => {
-              Object.assign(draft, { ...draft, ...serializedEmployee });
-            }
-          )
+          employeesApi.util.updateQueryData("getEmployeeById", id, (draft) => {
+            return {
+              ...draft,
+              ...safeUpdate,
+              hireDate:
+                safeUpdate.hireDate instanceof Date
+                  ? safeUpdate.hireDate
+                  : safeUpdate.hireDate
+                  ? new Date(safeUpdate.hireDate)
+                  : draft.hireDate,
+            };
+          })
         );
 
         try {

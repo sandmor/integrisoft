@@ -1,235 +1,369 @@
 "use client";
 
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Plus, MoreHorizontal } from "lucide-react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import { PlusCircle, Loader2, MoreHorizontal } from "lucide-react";
+import { format } from "date-fns";
 
-// Task status types and colors
-const statusColumns = [
-  { id: "todo", name: "To Do", color: "bg-gray-100" },
-  { id: "in_progress", name: "In Progress", color: "bg-blue-50" },
-  { id: "review", name: "Review", color: "bg-yellow-50" },
-  { id: "done", name: "Done", color: "bg-green-50" },
-];
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Task } from "@/lib/redux/projectsApi";
 
-// Task priority colors
-const priorityColorMap: Record<number, string> = {
-  1: "bg-gray-100 text-gray-700", // Low
-  2: "bg-blue-100 text-blue-700", // Medium
-  3: "bg-red-100 text-red-700", // High
-};
-
-// Task type definition
-type Task = {
+type Column = {
   id: string;
   title: string;
-  description?: string;
-  status: string;
-  priority: number;
-  dueDate?: string;
-  assignee?: {
-    id: string;
-    name: string;
-  };
-};
-
-// Define TasksByStatus type with proper typing for each status column
-type TasksByStatus = {
-  todo: Task[];
-  in_progress: Task[];
-  review: Task[];
-  done: Task[];
-  [key: string]: Task[]; // Allow for dynamic status keys
-};
-
-// Sample empty state for a new task board
-const emptyTasksByStatus: TasksByStatus = {
-  todo: [],
-  in_progress: [],
-  review: [],
-  done: [],
+  tasks: Task[];
 };
 
 type TaskBoardProps = {
   projectId: string;
-  tasks?: Task[];
-  isLoading?: boolean;
-  onTaskMove?: (taskId: string, newStatus: string) => void;
+  initialTasks: Task[];
+  onTaskMove: (taskId: string, newStatus: string) => Promise<void>;
 };
 
 export function TaskBoard({
   projectId,
-  tasks = [],
-  isLoading = false,
+  initialTasks,
   onTaskMove,
 }: TaskBoardProps) {
-  // Group tasks by status
-  const [tasksByStatus, setTasksByStatus] = useState<TasksByStatus>(() => {
-    const grouped = { ...emptyTasksByStatus };
+  const [columns, setColumns] = useState<Column[]>([
+    { id: "todo", title: "To Do", tasks: [] },
+    { id: "in_progress", title: "In Progress", tasks: [] },
+    { id: "review", title: "Review", tasks: [] },
+    { id: "done", title: "Done", tasks: [] },
+  ]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingTaskId, setLoadingTaskId] = useState<string | null>(null);
 
+  useEffect(() => {
+    distributeTasksToColumns(initialTasks);
+  }, [initialTasks]);
+
+  const distributeTasksToColumns = (tasks: Task[]) => {
+    const newColumns = [...columns];
+
+    // Reset tasks in all columns
+    newColumns.forEach((column) => {
+      column.tasks = [];
+    });
+
+    // Distribute tasks to respective columns
     tasks.forEach((task) => {
-      // Ensure the status exists as a key (for custom statuses)
-      if (!grouped[task.status]) {
-        grouped[task.status] = [];
-      }
-      grouped[task.status].push(task);
-    });
-
-    return grouped;
-  });
-
-  // Handle drag start
-  const handleDragStart = (e: React.DragEvent, taskId: string) => {
-    e.dataTransfer.setData("taskId", taskId);
-  };
-
-  // Handle drag over
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  // Handle drop
-  const handleDrop = (e: React.DragEvent, targetStatus: string) => {
-    e.preventDefault();
-    const taskId = e.dataTransfer.getData("taskId");
-
-    // Find the task
-    let task: Task | undefined;
-    let sourceStatus: string | undefined;
-
-    Object.entries(tasksByStatus).forEach(([status, tasksInStatus]) => {
-      const foundTask = tasksInStatus.find((t) => t.id === taskId);
-      if (foundTask) {
-        task = foundTask;
-        sourceStatus = status;
+      const columnIndex = newColumns.findIndex((col) => col.id === task.status);
+      if (columnIndex !== -1) {
+        newColumns[columnIndex].tasks.push(task);
       }
     });
 
-    if (!task || !sourceStatus || sourceStatus === targetStatus) return;
+    setColumns(newColumns);
+  };
 
-    // Update task status locally
-    const updatedTasksByStatus = { ...tasksByStatus };
-    updatedTasksByStatus[sourceStatus] = updatedTasksByStatus[
-      sourceStatus
-    ].filter((t) => t.id !== taskId);
+  const handleDragEnd = async (result: any) => {
+    const { source, destination, draggableId } = result;
 
-    task.status = targetStatus;
+    // Dropped outside the list
+    if (!destination) return;
 
-    // Ensure the target status array exists
-    if (!updatedTasksByStatus[targetStatus]) {
-      updatedTasksByStatus[targetStatus] = [];
-    }
+    // Dropped in the same position
+    if (
+      source.droppableId === destination.droppableId &&
+      source.index === destination.index
+    )
+      return;
 
-    updatedTasksByStatus[targetStatus] = [
-      ...updatedTasksByStatus[targetStatus],
-      task,
-    ];
+    // Find the task that was moved
+    const task = initialTasks.find((t) => t.id === draggableId);
+    if (!task) return;
 
-    setTasksByStatus(updatedTasksByStatus);
+    // If the column changed, update the task status
+    if (source.droppableId !== destination.droppableId) {
+      const newStatus = destination.droppableId;
 
-    // Call onTaskMove to update on the server
-    if (onTaskMove) {
-      onTaskMove(taskId, targetStatus);
+      // Update locally first for better UX
+      const newColumns = [...columns];
+
+      // Remove task from source column
+      const sourceColumnIndex = newColumns.findIndex(
+        (col) => col.id === source.droppableId
+      );
+      if (sourceColumnIndex !== -1) {
+        const sourceColumn = newColumns[sourceColumnIndex];
+        const taskToMove = sourceColumn.tasks[source.index];
+        sourceColumn.tasks.splice(source.index, 1);
+      }
+
+      // Add task to destination column
+      const destinationColumnIndex = newColumns.findIndex(
+        (col) => col.id === destination.droppableId
+      );
+      if (destinationColumnIndex !== -1) {
+        const destinationColumn = newColumns[destinationColumnIndex];
+        const updatedTask = { ...task, status: newStatus as any };
+        destinationColumn.tasks.splice(destination.index, 0, updatedTask);
+      }
+
+      setColumns(newColumns);
+      setLoadingTaskId(draggableId);
+
+      try {
+        // Call the API to update the task
+        await onTaskMove(draggableId, newStatus);
+      } catch (error) {
+        // If there's an error, revert to original task distribution
+        console.error("Failed to update task status:", error);
+        distributeTasksToColumns(initialTasks);
+      } finally {
+        setLoadingTaskId(null);
+      }
+    } else {
+      // Just reorder within the same column
+      const newColumns = [...columns];
+      const columnIndex = newColumns.findIndex(
+        (col) => col.id === source.droppableId
+      );
+
+      if (columnIndex !== -1) {
+        const column = newColumns[columnIndex];
+        const [removed] = column.tasks.splice(source.index, 1);
+        column.tasks.splice(destination.index, 0, removed);
+        setColumns(newColumns);
+      }
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  const getPriorityBadge = (priority: number) => {
+    switch (priority) {
+      case 1:
+        return { label: "Low", variant: "outline" };
+      case 2:
+        return { label: "Medium", variant: "secondary" };
+      case 3:
+        return { label: "High", variant: "destructive" };
+      default:
+        return { label: "Medium", variant: "secondary" };
+    }
+  };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-      {statusColumns.map((column) => (
-        <div
-          key={column.id}
-          className={`rounded-lg ${column.color} p-2`}
-          onDragOver={handleDragOver}
-          onDrop={(e) => handleDrop(e, column.id)}
-        >
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="font-medium">{column.name}</h3>
-            <Badge>{tasksByStatus[column.id]?.length || 0}</Badge>
-          </div>
+    <div className="w-full overflow-auto">
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <div className="flex gap-4 pb-4 min-w-[800px]">
+          {columns.map((column) => (
+            <div key={column.id} className="flex flex-col w-72">
+              <div className="flex items-center justify-between mb-2 px-1">
+                <h3 className="text-sm font-medium">{column.title}</h3>
+                <Badge variant="secondary" className="text-xs">
+                  {column.tasks.length}
+                </Badge>
+              </div>
 
-          <div className="space-y-2">
-            {tasksByStatus[column.id]?.map((task: Task) => (
-              <Card
-                key={task.id}
-                className="cursor-grab"
-                draggable
-                onDragStart={(e) => handleDragStart(e, task.id)}
-              >
-                <CardContent className="p-3">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-medium text-sm">{task.title}</p>
-                      {task.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
-                          {task.description}
-                        </p>
-                      )}
-                    </div>
-                    <Button variant="ghost" size="icon" className="h-7 w-7">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  <div className="flex justify-between items-center mt-3">
-                    <div className="flex space-x-1">
-                      <Badge
-                        variant="outline"
-                        className={priorityColorMap[task.priority]}
+              <Droppable droppableId={column.id}>
+                {(provided) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className="bg-muted/30 rounded-md p-2 min-h-[500px] flex-1"
+                  >
+                    {column.tasks.map((task, index) => (
+                      <Draggable
+                        key={task.id}
+                        draggableId={task.id}
+                        index={index}
                       >
-                        {task.priority === 1
-                          ? "Low"
-                          : task.priority === 2
-                          ? "Medium"
-                          : "High"}
-                      </Badge>
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                            className={cn(
+                              "mb-2 rounded-md border bg-card text-card-foreground shadow-sm",
+                              snapshot.isDragging && "ring-2 ring-primary",
+                              loadingTaskId === task.id && "opacity-70"
+                            )}
+                          >
+                            <Card>
+                              <CardContent className="p-3">
+                                <div className="flex items-start justify-between mb-2">
+                                  <Link
+                                    href={`/dashboard/projects/${projectId}/tasks/${task.id}`}
+                                    className="font-medium text-sm hover:underline"
+                                  >
+                                    {task.title}
+                                  </Link>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 w-6 p-0"
+                                      >
+                                        <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem asChild>
+                                        <Link
+                                          href={`/dashboard/projects/${projectId}/tasks/${task.id}`}
+                                        >
+                                          View Details
+                                        </Link>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem asChild>
+                                        <Link
+                                          href={`/dashboard/projects/${projectId}/tasks/${task.id}/edit`}
+                                        >
+                                          Edit Task
+                                        </Link>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      {column.id !== "todo" && (
+                                        <DropdownMenuItem
+                                          onClick={async () => {
+                                            setLoadingTaskId(task.id);
+                                            try {
+                                              await onTaskMove(task.id, "todo");
+                                            } finally {
+                                              setLoadingTaskId(null);
+                                            }
+                                          }}
+                                        >
+                                          Move to To Do
+                                        </DropdownMenuItem>
+                                      )}
+                                      {column.id !== "in_progress" && (
+                                        <DropdownMenuItem
+                                          onClick={async () => {
+                                            setLoadingTaskId(task.id);
+                                            try {
+                                              await onTaskMove(
+                                                task.id,
+                                                "in_progress"
+                                              );
+                                            } finally {
+                                              setLoadingTaskId(null);
+                                            }
+                                          }}
+                                        >
+                                          Move to In Progress
+                                        </DropdownMenuItem>
+                                      )}
+                                      {column.id !== "review" && (
+                                        <DropdownMenuItem
+                                          onClick={async () => {
+                                            setLoadingTaskId(task.id);
+                                            try {
+                                              await onTaskMove(
+                                                task.id,
+                                                "review"
+                                              );
+                                            } finally {
+                                              setLoadingTaskId(null);
+                                            }
+                                          }}
+                                        >
+                                          Move to Review
+                                        </DropdownMenuItem>
+                                      )}
+                                      {column.id !== "done" && (
+                                        <DropdownMenuItem
+                                          onClick={async () => {
+                                            setLoadingTaskId(task.id);
+                                            try {
+                                              await onTaskMove(task.id, "done");
+                                            } finally {
+                                              setLoadingTaskId(null);
+                                            }
+                                          }}
+                                        >
+                                          Mark as Done
+                                        </DropdownMenuItem>
+                                      )}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
 
-                      {task.dueDate && (
-                        <Badge variant="outline" className="text-xs">
-                          {new Date(task.dueDate).toLocaleDateString()}
-                        </Badge>
-                      )}
-                    </div>
+                                {task.description && (
+                                  <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                                    {task.description}
+                                  </p>
+                                )}
 
-                    {task.assignee && (
-                      <div
-                        className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium"
-                        title={task.assignee.name}
+                                <div className="flex justify-between items-center mt-2">
+                                  <Badge
+                                    variant={
+                                      getPriorityBadge(task.priority)
+                                        .variant as any
+                                    }
+                                    className="text-xs"
+                                  >
+                                    {getPriorityBadge(task.priority).label}
+                                  </Badge>
+
+                                  {loadingTaskId === task.id ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : task.dueDate ? (
+                                    <span className="text-xs text-muted-foreground">
+                                      {format(new Date(task.dueDate), "MMM d")}
+                                    </span>
+                                  ) : null}
+                                </div>
+
+                                {task.assignee && (
+                                  <div className="flex items-center mt-3">
+                                    <Avatar className="h-5 w-5 mr-1">
+                                      <AvatarFallback className="text-[10px]">
+                                        {task.assignee.name
+                                          .split(" ")
+                                          .map((n) => n[0])
+                                          .join("")}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <span className="text-xs truncate max-w-[150px]">
+                                      {task.assignee.name}
+                                    </span>
+                                  </div>
+                                )}
+                              </CardContent>
+                            </Card>
+                          </div>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+
+                    {column.id === "todo" && (
+                      <Button
+                        variant="ghost"
+                        className="w-full mt-2 text-muted-foreground"
+                        size="sm"
+                        asChild
                       >
-                        {task.assignee.name.charAt(0)}
-                      </div>
+                        <Link
+                          href={`/dashboard/projects/${projectId}/tasks/new`}
+                        >
+                          <PlusCircle className="h-4 w-4 mr-1" />
+                          Add Task
+                        </Link>
+                      </Button>
                     )}
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start text-muted-foreground text-xs"
-              asChild
-            >
-              <Link
-                href={`/dashboard/projects/${projectId}/tasks/new?status=${column.id}`}
-              >
-                <Plus className="h-3 w-3 mr-1" />
-                Add Task
-              </Link>
-            </Button>
-          </div>
+                )}
+              </Droppable>
+            </div>
+          ))}
         </div>
-      ))}
+      </DragDropContext>
     </div>
   );
 }

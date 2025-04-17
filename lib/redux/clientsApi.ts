@@ -1,11 +1,10 @@
 import { api } from "./api";
 
-// Serialized interface for Redux store
-export interface SerializedClient
-  extends Omit<Client, "createdAt" | "updatedAt"> {
-  createdAt?: string;
-  updatedAt?: string;
-}
+type TypeSafeUpdate<T> = {
+  [K in keyof T]?: T[K] extends Date | null | undefined
+    ? Date | null | undefined
+    : T[K];
+};
 
 export interface Client {
   id: string;
@@ -80,7 +79,10 @@ export const clientsApi = api.injectEndpoints({
       providesTags: (_, __, id) => [{ type: "Clients", id }],
     }),
 
-    addClient: build.mutation<Client, Partial<Client>>({
+    addClient: build.mutation<
+      Client,
+      TypeSafeUpdate<Omit<Client, "id" | "createdAt" | "updatedAt">>
+    >({
       query: (body) => ({
         url: "/clients",
         method: "POST",
@@ -93,9 +95,9 @@ export const clientsApi = api.injectEndpoints({
         const optimisticClient = {
           ...newClient,
           id: tempId,
-          createdAt: new Date().toJSON(),
-          updatedAt: new Date().toJSON(),
-        } as unknown as Client;
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as Client;
 
         const patchResult = dispatch(
           clientsApi.util.updateQueryData("getClients", {}, (draft) => {
@@ -107,18 +109,12 @@ export const clientsApi = api.injectEndpoints({
         try {
           const { data: createdClient } = await queryFulfilled;
 
-          const serializedClient = {
-            ...createdClient,
-            createdAt: createdClient.createdAt?.toJSON(),
-            updatedAt: createdClient.updatedAt?.toJSON(),
-          } as unknown as Client;
-
           dispatch(
             clientsApi.util.updateQueryData("getClients", {}, (draft) => {
               const index = draft.data.findIndex(
                 (client) => client.id === tempId
               );
-              if (index !== -1) draft.data[index] = serializedClient;
+              if (index !== -1) draft.data[index] = createdClient;
             })
           );
         } catch {
@@ -127,40 +123,38 @@ export const clientsApi = api.injectEndpoints({
       },
     }),
 
-    updateClient: build.mutation<Client, Partial<Client> & { id: string }>({
-      query: ({ id, ...body }) => ({
+    updateClient: build.mutation<
+      Client,
+      {
+        id: string;
+        client: TypeSafeUpdate<Omit<Client, "id" | "createdAt" | "updatedAt">>;
+      }
+    >({
+      query: ({ id, client }) => ({
         url: `/clients/${id}`,
         method: "PATCH",
-        body,
+        body: client,
       }),
       invalidatesTags: (_, __, arg) => [
         { type: "Clients", id: arg.id },
         { type: "Clients", id: "LIST" },
       ],
-      onQueryStarted: async (updatedClient, { dispatch, queryFulfilled }) => {
-        const serializedClient = {
-          ...updatedClient,
-          updatedAt: new Date().toJSON(),
-        } as unknown as Client;
+      onQueryStarted: async ({ id, client }, { dispatch, queryFulfilled }) => {
+        const safeUpdate = { ...client, updatedAt: new Date() };
 
         const listPatch = dispatch(
           clientsApi.util.updateQueryData("getClients", {}, (draft) => {
-            const index = draft.data.findIndex(
-              (client) => client.id === updatedClient.id
-            );
-            if (index !== -1)
-              draft.data[index] = { ...draft.data[index], ...serializedClient };
+            const index = draft.data.findIndex((c) => c.id === id);
+            if (index !== -1) {
+              draft.data[index] = { ...draft.data[index], ...safeUpdate };
+            }
           })
         );
 
         const detailPatch = dispatch(
-          clientsApi.util.updateQueryData(
-            "getClientById",
-            updatedClient.id,
-            (draft) => {
-              Object.assign(draft, { ...draft, ...serializedClient });
-            }
-          )
+          clientsApi.util.updateQueryData("getClientById", id, (draft) => {
+            return { ...draft, ...safeUpdate };
+          })
         );
 
         try {

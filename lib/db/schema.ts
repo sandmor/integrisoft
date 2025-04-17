@@ -773,7 +773,6 @@ export const systemSettings = pgTable("system_settings", {
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });
 
-// Export relationships for better type safety with Drizzle
 export const usersRelations = relations(users, ({ one }) => ({
   employees: one(employees, {
     fields: [users.id],
@@ -821,6 +820,11 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
     fields: [projects.productId],
     references: [products.id],
   }),
+  milestones: many(milestones),
+  tasks: many(tasks),
+  budgets: many(budgets),
+  contracts: many(contracts),
+  transactions: many(transactions),
 }));
 
 export const clientsRelations = relations(clients, ({ one, many }) => ({
@@ -830,6 +834,10 @@ export const clientsRelations = relations(clients, ({ one, many }) => ({
     relationName: "accountManager",
   }),
   projects: many(projects),
+  contacts: many(clientContacts),
+  interactions: many(clientInteractions),
+  contracts: many(contracts),
+  serviceAgreements: many(serviceLevelAgreements),
 }));
 
 export const productsRelations = relations(products, ({ one, many }) => ({
@@ -845,9 +853,12 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   }),
   projects: many(projects),
   versions: many(productVersions),
+  technicalSpecs: many(technicalSpecs),
+  dependencies: many(productDependencies, { relationName: "dependencies" }),
+  dependents: many(productDependencies, { relationName: "dependents" }),
 }));
 
-export const systemLogsRelations = relations(activitiesFeed, ({ one }) => ({
+export const activitiesFeedRelations = relations(activitiesFeed, ({ one }) => ({
   user: one(users, {
     fields: [activitiesFeed.userId],
     references: [users.id],
@@ -875,5 +886,245 @@ export const systemLogsRelations = relations(activitiesFeed, ({ one }) => ({
   milestone: one(milestones, {
     fields: [activitiesFeed.milestoneId],
     references: [milestones.id],
+  }),
+}));
+
+export const milestonesRelations = relations(milestones, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [milestones.projectId],
+    references: [projects.id],
+  }),
+  tasks: many(tasks),
+}));
+
+export const tasksRelations = relations(tasks, ({ one }) => ({
+  project: one(projects, {
+    fields: [tasks.projectId],
+    references: [projects.id],
+  }),
+  milestone: one(milestones, {
+    fields: [tasks.milestoneId],
+    references: [milestones.id],
+  }),
+  assignedTo: one(employees, {
+    fields: [tasks.assignedToId],
+    references: [employees.id],
+  }),
+  createdBy: one(users, {
+    fields: [tasks.createdById],
+    references: [users.id],
+  }),
+}));
+
+export const clientContactsRelations = relations(clientContacts, ({ one }) => ({
+  client: one(clients, {
+    fields: [clientContacts.clientId],
+    references: [clients.id],
+  }),
+}));
+
+export const clientInteractionsRelations = relations(
+  clientInteractions,
+  ({ one }) => ({
+    client: one(clients, {
+      fields: [clientInteractions.clientId],
+      references: [clients.id],
+    }),
+    contact: one(clientContacts, {
+      fields: [clientInteractions.contactId],
+      references: [clientContacts.id],
+    }),
+    employee: one(employees, {
+      fields: [clientInteractions.employeeId],
+      references: [employees.id],
+    }),
+    createdBy: one(users, {
+      fields: [clientInteractions.createdById],
+      references: [users.id],
+    }),
+  })
+);
+
+export const positionsRelations = relations(positions, ({ one, many }) => ({
+  department: one(departments, {
+    fields: [positions.departmentId],
+    references: [departments.id],
+  }),
+  employees: many(employees),
+}));
+
+export const productDependenciesRelations = relations(
+  productDependencies,
+  ({ one }) => ({
+    product: one(products, {
+      fields: [productDependencies.productId],
+      references: [products.id],
+      relationName: "dependencies",
+    }),
+    dependsOnProduct: one(products, {
+      fields: [productDependencies.dependsOnProductId],
+      references: [products.id],
+      relationName: "dependents",
+    }),
+  })
+);
+
+export const productVersionsRelations = relations(
+  productVersions,
+  ({ one, many }) => ({
+    product: one(products, {
+      fields: [productVersions.productId],
+      references: [products.id],
+    }),
+    createdBy: one(users, {
+      fields: [productVersions.createdById],
+      references: [users.id],
+    }),
+    technicalSpecs: many(technicalSpecs),
+  })
+);
+
+export const technicalSpecsRelations = relations(technicalSpecs, ({ one }) => ({
+  product: one(products, {
+    fields: [technicalSpecs.productId],
+    references: [products.id],
+  }),
+  version: one(productVersions, {
+    fields: [technicalSpecs.versionId],
+    references: [productVersions.id],
+  }),
+  createdBy: one(users, {
+    fields: [technicalSpecs.createdById],
+    references: [users.id],
+  }),
+}));
+
+export const contractsRelations = relations(contracts, ({ one, many }) => ({
+  client: one(clients, {
+    fields: [contracts.clientId],
+    references: [clients.id],
+  }),
+  project: one(projects, {
+    fields: [contracts.projectId],
+    references: [projects.id],
+  }),
+  createdBy: one(users, {
+    fields: [contracts.createdById],
+    references: [users.id],
+  }),
+  serviceLevelAgreements: many(serviceLevelAgreements),
+}));
+
+export const serviceLevelAgreementsRelations = relations(
+  serviceLevelAgreements,
+  ({ one }) => ({
+    client: one(clients, {
+      fields: [serviceLevelAgreements.clientId],
+      references: [clients.id],
+    }),
+    contract: one(contracts, {
+      fields: [serviceLevelAgreements.contractId],
+      references: [contracts.id],
+    }),
+    createdBy: one(users, {
+      fields: [serviceLevelAgreements.createdById],
+      references: [users.id],
+    }),
+  })
+);
+
+export const projectTeamMembersRelations = relations(
+  projectTeamMembers,
+  ({ one }) => ({
+    project: one(projects, {
+      fields: [projectTeamMembers.projectId],
+      references: [projects.id],
+      relationName: "teamMembers",
+    }),
+    employee: one(employees, {
+      fields: [projectTeamMembers.employeeId],
+      references: [employees.id],
+    }),
+  })
+);
+
+export const employeeSkillsRelations = relations(employeeSkills, ({ one }) => ({
+  employee: one(employees, {
+    fields: [employeeSkills.employeeId],
+    references: [employees.id],
+  }),
+  skill: one(skills, {
+    fields: [employeeSkills.skillId],
+    references: [skills.id],
+  }),
+}));
+
+export const skillsRelations = relations(skills, ({ many }) => ({
+  employeeSkills: many(employeeSkills),
+}));
+
+export const transactionCategoriesRelations = relations(
+  transactionCategories,
+  ({ one, many }) => ({
+    parentCategory: one(transactionCategories, {
+      fields: [transactionCategories.parentCategoryId],
+      references: [transactionCategories.id],
+    }),
+    childCategories: many(transactionCategories),
+    transactions: many(transactions),
+  })
+);
+
+export const transactionsRelations = relations(transactions, ({ one }) => ({
+  category: one(transactionCategories, {
+    fields: [transactions.categoryId],
+    references: [transactionCategories.id],
+  }),
+  costCenter: one(costCenters, {
+    fields: [transactions.costCenterId],
+    references: [costCenters.id],
+  }),
+  project: one(projects, {
+    fields: [transactions.projectId],
+    references: [projects.id],
+  }),
+  createdBy: one(users, {
+    fields: [transactions.createdById],
+    references: [users.id],
+  }),
+  approvedBy: one(users, {
+    fields: [transactions.approvedById],
+    references: [users.id],
+  }),
+}));
+
+export const costCentersRelations = relations(costCenters, ({ one, many }) => ({
+  department: one(departments, {
+    fields: [costCenters.departmentId],
+    references: [departments.id],
+  }),
+  transactions: many(transactions),
+  budgets: many(budgets),
+}));
+
+export const budgetsRelations = relations(budgets, ({ one }) => ({
+  costCenter: one(costCenters, {
+    fields: [budgets.costCenterId],
+    references: [costCenters.id],
+  }),
+  project: one(projects, {
+    fields: [budgets.projectId],
+    references: [projects.id],
+  }),
+  createdBy: one(users, {
+    fields: [budgets.createdById],
+    references: [users.id],
+  }),
+}));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, {
+    fields: [notifications.userId],
+    references: [users.id],
   }),
 }));

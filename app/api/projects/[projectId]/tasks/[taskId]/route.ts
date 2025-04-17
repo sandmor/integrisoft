@@ -12,6 +12,86 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { createId } from "@paralleldrive/cuid2";
 
+// GET /api/projects/[projectId]/tasks/[taskId] - Get a single task
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ projectId: string; taskId: string }> }
+) {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+    if (!session || !session.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { projectId, taskId } = await params;
+
+    // Retrieve task with relationships
+    const taskWithDetails = await db
+      .select({
+        id: tasks.id,
+        title: tasks.title,
+        description: tasks.description,
+        status: tasks.status,
+        priority: tasks.priority,
+        assignedToId: tasks.assignedToId,
+        estimatedHours: tasks.estimatedHours,
+        actualHours: tasks.actualHours,
+        dueDate: tasks.dueDate,
+        startDate: tasks.startDate,
+        completedDate: tasks.completedDate,
+        createdAt: tasks.createdAt,
+        updatedAt: tasks.updatedAt,
+        milestoneId: tasks.milestoneId,
+        assigneeName: sql`CASE WHEN ${employees.id} IS NOT NULL THEN concat(${users.name}, ' ', ${users.lastName}) ELSE NULL END`,
+        milestoneName: milestones.name,
+      })
+      .from(tasks)
+      .leftJoin(employees, eq(tasks.assignedToId, employees.id))
+      .leftJoin(users, eq(employees.userId, users.id))
+      .leftJoin(milestones, eq(tasks.milestoneId, milestones.id))
+      .where(
+        and(
+          eq(tasks.id, taskId),
+          eq(tasks.projectId, projectId),
+          not(eq(tasks.isDeleted, true))
+        )
+      )
+      .then((rows) => rows[0]);
+
+    if (!taskWithDetails) {
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    }
+
+    // Format the response
+    const formattedTask = {
+      ...taskWithDetails,
+      assignee: taskWithDetails.assignedToId
+        ? {
+            id: taskWithDetails.assignedToId,
+            name: taskWithDetails.assigneeName || `Unknown Employee`,
+          }
+        : null,
+      milestone: taskWithDetails.milestoneId
+        ? {
+            id: taskWithDetails.milestoneId,
+            name: taskWithDetails.milestoneName || `Unknown Milestone`,
+          }
+        : null,
+    };
+
+    // Use consistent format with data property
+    return NextResponse.json({ data: formattedTask });
+  } catch (error) {
+    console.error("Error retrieving task:", error);
+    return NextResponse.json(
+      { error: "Failed to retrieve task" },
+      { status: 500 }
+    );
+  }
+}
+
 // PATCH /api/projects/[projectId]/tasks/[taskId] - Update a task
 export async function PATCH(
   req: NextRequest,
@@ -146,7 +226,8 @@ export async function PATCH(
         : null,
     };
 
-    return NextResponse.json(formattedTask);
+    // Use consistent format with data property
+    return NextResponse.json({ data: formattedTask });
   } catch (error) {
     console.error("Error updating task:", error);
     return NextResponse.json(

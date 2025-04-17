@@ -15,6 +15,7 @@ import { TeamMembersTab } from "@/components/dashboard/projects/team-members-tab
 import { format } from "date-fns";
 import { CalendarIcon, FileText, PenSquare } from "lucide-react";
 import { getEmployees, getProject } from "@/lib/actions/projects";
+import { TasksTab } from "@/components/dashboard/projects/tasks-tab";
 
 type ProjectPageProps = {
   params: Promise<{
@@ -77,6 +78,7 @@ export default async function ProjectDetailsPage({ params }: ProjectPageProps) {
       <Tabs defaultValue="overview" className="mt-6">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="tasks">Tasks</TabsTrigger>
           <TabsTrigger value="milestones">Milestones</TabsTrigger>
           <TabsTrigger value="team">Team</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
@@ -182,6 +184,10 @@ export default async function ProjectDetailsPage({ params }: ProjectPageProps) {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="tasks" className="mt-6">
+          <TasksTab projectId={id} />
         </TabsContent>
 
         <TabsContent value="milestones" className="mt-6">

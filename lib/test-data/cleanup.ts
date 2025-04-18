@@ -16,6 +16,7 @@ export async function clearAllData(
   await tx.delete(schema.clientInteractions).execute();
   await tx.delete(schema.contracts).execute();
   await tx.delete(schema.projectTeamMembers).execute();
+  await tx.delete(schema.kanbanBoardOrder).execute();
   await tx.delete(schema.tasks).execute();
   await tx.delete(schema.milestones).execute();
   await tx.delete(schema.transactions).execute();

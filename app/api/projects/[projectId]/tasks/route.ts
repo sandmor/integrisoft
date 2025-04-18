@@ -11,6 +11,11 @@ import { eq, and, not, sql, desc } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { createId } from "@paralleldrive/cuid2";
+import {
+  TaskStatus,
+  addTaskToOrder,
+  getOrderedTasksForColumn,
+} from "@/lib/db/kanban-order";
 
 // GET /api/projects/[projectId]/tasks - Get all tasks for a project
 export async function GET(
@@ -26,59 +31,139 @@ export async function GET(
     }
 
     const { projectId } = await params;
+    const url = new URL(req.url);
+    const orderByStatus = url.searchParams.get("orderByStatus") === "true";
 
-    // Get all tasks for the project with assignee information
-    const tasksWithAssignees = await db
-      .select({
-        id: tasks.id,
-        title: tasks.title,
-        description: tasks.description,
-        status: tasks.status,
-        priority: tasks.priority,
-        assignedToId: tasks.assignedToId,
-        estimatedHours: tasks.estimatedHours,
-        actualHours: tasks.actualHours,
-        dueDate: tasks.dueDate,
-        startDate: tasks.startDate,
-        completedDate: tasks.completedDate,
-        createdAt: tasks.createdAt,
-        updatedAt: tasks.updatedAt,
-        milestoneId: tasks.milestoneId,
-        assigneeName: sql`CASE WHEN ${employees.id} IS NOT NULL THEN concat(${users.name}, ' ', ${users.lastName}) ELSE NULL END`,
-        milestoneName: milestones.name,
-      })
-      .from(tasks)
-      .leftJoin(employees, eq(tasks.assignedToId, employees.id))
-      .leftJoin(users, eq(employees.userId, users.id))
-      .leftJoin(milestones, eq(tasks.milestoneId, milestones.id))
-      .where(
-        and(eq(tasks.projectId, projectId), not(eq(tasks.isDeleted, true)))
-      )
-      .orderBy(desc(tasks.updatedAt));
+    if (orderByStatus) {
+      // Get tasks for kanban board view, organized by status columns
+      const statusList: TaskStatus[] = [
+        "todo",
+        "in_progress",
+        "review",
+        "done",
+      ];
 
-    // Format the response data
-    const formattedTasks = tasksWithAssignees.map((task) => {
-      return {
-        ...task,
-        assignee: task.assignedToId
-          ? {
-              id: task.assignedToId,
-              name: task.assigneeName || `Unknown Employee`,
+      // Create a result object to hold tasks for each status
+      const tasksResult: Record<string, any[]> = {};
+      let totalCount = 0;
+
+      // Get tasks for each status column with proper ordering
+      for (const status of statusList) {
+        const columnTasks = await getOrderedTasksForColumn(projectId, status);
+
+        // Get assignee and milestone information for these tasks
+        const tasksWithDetails = await Promise.all(
+          columnTasks.map(async (task) => {
+            let assignee = null;
+            let milestone = null;
+
+            if (task.assignedToId) {
+              const assigneeData = await db
+                .select({
+                  id: employees.id,
+                  name: sql`concat(${users.name}, ' ', ${users.lastName})`,
+                })
+                .from(employees)
+                .leftJoin(users, eq(employees.userId, users.id))
+                .where(eq(employees.id, task.assignedToId))
+                .then((rows) => rows[0]);
+
+              if (assigneeData) {
+                assignee = {
+                  id: assigneeData.id,
+                  name: assigneeData.name || "Unknown Employee",
+                };
+              }
             }
-          : null,
-        milestone: task.milestoneId
-          ? {
-              id: task.milestoneId,
-              name: task.milestoneName || `Unknown Milestone`,
-            }
-          : null,
-      };
-    });
 
-    return NextResponse.json({
-      data: formattedTasks,
-      count: formattedTasks.length,
-    });
+            if (task.milestoneId) {
+              const milestoneData = await db
+                .select({
+                  id: milestones.id,
+                  name: milestones.name,
+                })
+                .from(milestones)
+                .where(eq(milestones.id, task.milestoneId))
+                .then((rows) => rows[0]);
+
+              if (milestoneData) {
+                milestone = {
+                  id: milestoneData.id,
+                  name: milestoneData.name,
+                };
+              }
+            }
+
+            return {
+              ...task,
+              assignee,
+              milestone,
+            };
+          })
+        );
+
+        tasksResult[status] = tasksWithDetails;
+        totalCount += tasksWithDetails.length;
+      }
+
+      return NextResponse.json({
+        data: tasksResult,
+        count: totalCount,
+      });
+    } else {
+      // Get tasks for standard list/calendar views
+      const tasksWithAssignees = await db
+        .select({
+          id: tasks.id,
+          title: tasks.title,
+          description: tasks.description,
+          status: tasks.status,
+          priority: tasks.priority,
+          assignedToId: tasks.assignedToId,
+          estimatedHours: tasks.estimatedHours,
+          actualHours: tasks.actualHours,
+          dueDate: tasks.dueDate,
+          startDate: tasks.startDate,
+          completedDate: tasks.completedDate,
+          createdAt: tasks.createdAt,
+          updatedAt: tasks.updatedAt,
+          milestoneId: tasks.milestoneId,
+          assigneeName: sql`CASE WHEN ${employees.id} IS NOT NULL THEN concat(${users.name}, ' ', ${users.lastName}) ELSE NULL END`,
+          milestoneName: milestones.name,
+        })
+        .from(tasks)
+        .leftJoin(employees, eq(tasks.assignedToId, employees.id))
+        .leftJoin(users, eq(employees.userId, users.id))
+        .leftJoin(milestones, eq(tasks.milestoneId, milestones.id))
+        .where(
+          and(eq(tasks.projectId, projectId), not(eq(tasks.isDeleted, true)))
+        )
+        .orderBy(desc(tasks.updatedAt));
+
+      // Format the response data
+      const formattedTasks = tasksWithAssignees.map((task) => {
+        return {
+          ...task,
+          assignee: task.assignedToId
+            ? {
+                id: task.assignedToId,
+                name: task.assigneeName || `Unknown Employee`,
+              }
+            : null,
+          milestone: task.milestoneId
+            ? {
+                id: task.milestoneId,
+                name: task.milestoneName || `Unknown Milestone`,
+              }
+            : null,
+        };
+      });
+
+      return NextResponse.json({
+        data: formattedTasks,
+        count: formattedTasks.length,
+      });
+    }
   } catch (error) {
     console.error("Error fetching project tasks:", error);
     return NextResponse.json(
@@ -113,6 +198,7 @@ export async function POST(
     }
 
     const taskId = createId();
+    const taskStatus = data.status || ("todo" as TaskStatus);
 
     // Insert task
     const [newTask] = await db
@@ -122,7 +208,7 @@ export async function POST(
         projectId,
         title: data.title,
         description: data.description,
-        status: data.status || "todo",
+        status: taskStatus,
         priority: data.priority || 2, // Default to medium priority
         assignedToId: data.assignedToId,
         milestoneId: data.milestoneId,
@@ -135,6 +221,9 @@ export async function POST(
         isDeleted: false,
       })
       .returning();
+
+    // Add task to the kanban board order for its status
+    await addTaskToOrder(projectId, taskStatus, taskId);
 
     // If an assignee is specified, add an activity record
     if (data.assignedToId) {

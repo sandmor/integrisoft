@@ -11,6 +11,7 @@ import {
   decimal,
   pgEnum,
   AnyPgColumn,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
 import { relations } from "drizzle-orm";
@@ -506,6 +507,21 @@ export const tasks = pgTable("tasks", {
   isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
+// Kanban board task ordering
+export const kanbanBoardOrder = pgTable(
+  "kanban_board_order",
+  {
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id),
+    status: taskStatusEnum("status").notNull(),
+    orderedTaskIds: text("ordered_task_ids").array().notNull().default([]),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.projectId, table.status] }),
+  })
+);
+
 // Project team members
 export const projectTeamMembers = pgTable(
   "project_team_members",
@@ -822,6 +838,7 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   }),
   milestones: many(milestones),
   tasks: many(tasks),
+  kanbanOrder: many(kanbanBoardOrder),
   budgets: many(budgets),
   contracts: many(contracts),
   transactions: many(transactions),
@@ -1128,3 +1145,13 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+export const kanbanBoardOrderRelations = relations(
+  kanbanBoardOrder,
+  ({ one }) => ({
+    project: one(projects, {
+      fields: [kanbanBoardOrder.projectId],
+      references: [projects.id],
+    }),
+  })
+);

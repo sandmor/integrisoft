@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -8,7 +8,7 @@ import { Plus, LayoutGrid, List, Filter, Calendar } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,14 +42,29 @@ export function TasksTab({ projectId }: TasksTabProps) {
     isLoading,
     isError,
     error: fetchError,
-  } = useGetTasksQuery(projectId);
+    refetch,
+  } = useGetTasksQuery({
+    projectId,
+    orderByStatus: view === "board", // Request column-ordered tasks for board view
+  });
 
   const [updateTask] = useUpdateTaskMutation();
 
-  const tasks = tasksData?.data || [];
+  // Extract tasks based on the response format
+  const tasks = tasksData
+    ? Array.isArray(tasksData.data)
+      ? tasksData.data
+      : Object.values(tasksData.groupedByStatus || {}).flat()
+    : [];
+
   const error = isError
     ? (fetchError as any)?.data?.error || "Failed to load tasks"
     : null;
+
+  // Refetch when view changes to get the appropriate data format
+  useEffect(() => {
+    refetch();
+  }, [view, refetch]);
 
   const handleTaskMove = async (taskId: string, newStatus: string) => {
     try {
@@ -97,30 +112,6 @@ export function TasksTab({ projectId }: TasksTabProps) {
       }
     });
   };
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-[300px]">
-        <Spinner />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded-md">
-        <p>Error: {error}</p>
-        <Button
-          variant="outline"
-          size="sm"
-          className="mt-2"
-          onClick={() => router.refresh()}
-        >
-          Try Again
-        </Button>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4">
@@ -218,23 +209,102 @@ export function TasksTab({ projectId }: TasksTabProps) {
         </div>
 
         <TabsContent value="board" className="mt-0">
-          <TaskBoard
-            projectId={projectId}
-            initialTasks={filteredTasks}
-            onTaskMove={handleTaskMove}
-          />
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="rounded-md bg-muted/30 p-2 min-h-[500px]"
+                >
+                  <div className="flex items-center justify-between mb-2 px-1">
+                    <Skeleton className="h-5 w-24" />
+                    <Skeleton className="h-5 w-6" />
+                  </div>
+                  {[1, 2, 3].map((j) => (
+                    <Skeleton key={j} className="h-28 w-full mb-2" />
+                  ))}
+                </div>
+              ))}
+            </div>
+          ) : error ? (
+            <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded-md">
+              <p>Error: {error}</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() => refetch()}
+              >
+                Try Again
+              </Button>
+            </div>
+          ) : (
+            <TaskBoard
+              projectId={projectId}
+              initialTasks={
+                tasksData?.groupedByStatus
+                  ? Object.entries(tasksData.groupedByStatus).flatMap(
+                      ([status, statusTasks]) =>
+                        filters.status.includes(status)
+                          ? statusTasks.filter((task) =>
+                              filters.priority.includes(task.priority)
+                            )
+                          : []
+                    )
+                  : filteredTasks
+              }
+              onTaskMove={handleTaskMove}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="list" className="mt-0">
-          <TaskList
-            projectId={projectId}
-            tasks={filteredTasks}
-            onStatusChange={handleTaskMove}
-          />
+          {isLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
+            </div>
+          ) : error ? (
+            <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded-md">
+              <p>Error: {error}</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() => refetch()}
+              >
+                Try Again
+              </Button>
+            </div>
+          ) : (
+            <TaskList
+              projectId={projectId}
+              tasks={filteredTasks}
+              onStatusChange={handleTaskMove}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="calendar" className="mt-0">
-          <TaskCalendar projectId={projectId} tasks={filteredTasks} />
+          {isLoading ? (
+            <Skeleton className="h-[500px] w-full" />
+          ) : error ? (
+            <div className="bg-destructive/10 border border-destructive text-destructive px-4 py-3 rounded-md">
+              <p>Error: {error}</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={() => refetch()}
+              >
+                Try Again
+              </Button>
+            </div>
+          ) : (
+            <TaskCalendar projectId={projectId} tasks={filteredTasks} />
+          )}
         </TabsContent>
       </Tabs>
     </div>

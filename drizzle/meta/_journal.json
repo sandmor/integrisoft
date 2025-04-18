@@ -99,6 +99,13 @@
       "when": 1744506825136,
       "tag": "0013_rare_exiles",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1744933907996,
+      "tag": "0014_burly_wonder_man",
+      "breakpoints": true
     }
   ]
 }

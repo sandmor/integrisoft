@@ -135,13 +135,16 @@ export interface Task {
   } | null;
 }
 
-export interface TaskResponse {
-  data: Task;
-}
-
+// New type for tasks response with grouped by status data
 export interface TasksResponse {
   data: Task[];
   count: number;
+  groupedByStatus?: Record<string, Task[]>;
+}
+
+// Type for task response (single task)
+export interface TaskResponse {
+  data: Task;
 }
 
 export const projectsApi = api.injectEndpoints({
@@ -1022,18 +1025,54 @@ export const projectsApi = api.injectEndpoints({
     }),
 
     // Tasks endpoints
-    getTasks: build.query<TasksResponse, string>({
-      query: (projectId) => `/projects/${projectId}/tasks`,
-      providesTags: (result, error, projectId) =>
-        result
-          ? [
-              ...result.data.map(({ id }) => ({
-                type: "Projects" as const,
-                id: `task-${id}`,
-              })),
-              { type: "Projects", id: `tasks-${projectId}` },
-            ]
-          : [{ type: "Projects", id: `tasks-${projectId}` }],
+    getTasks: build.query<
+      TasksResponse,
+      string | { projectId: string; orderByStatus?: boolean }
+    >({
+      query: (arg) => {
+        const projectId = typeof arg === "string" ? arg : arg.projectId;
+        const orderByStatus = typeof arg === "object" && arg.orderByStatus;
+
+        return {
+          url: `/projects/${projectId}/tasks${
+            orderByStatus ? "?orderByStatus=true" : ""
+          }`,
+        };
+      },
+      providesTags: (result, error, arg) => {
+        const projectId = typeof arg === "string" ? arg : arg.projectId;
+
+        if (!result?.data) {
+          return [{ type: "Projects", id: `tasks-${projectId}` }];
+        }
+
+        // Extract all task ids for tagging
+        const taskIds = Array.isArray(result.data)
+          ? result.data.map((task) => task.id)
+          : Object.values(result.groupedByStatus || {}).flatMap((tasks) =>
+              tasks.map((task) => task.id)
+            );
+
+        return [
+          ...taskIds.map((id) => ({
+            type: "Projects" as const,
+            id: `task-${id}`,
+          })),
+          { type: "Projects", id: `tasks-${projectId}` },
+        ];
+      },
+      transformResponse: (response: any) => {
+        if (response.data && !Array.isArray(response.data)) {
+          // Handle kanban grouped by status format
+          const allTasks = Object.values(response.data).flat();
+          return {
+            data: allTasks,
+            count: allTasks.length,
+            groupedByStatus: response.data,
+          };
+        }
+        return response;
+      },
       keepUnusedDataFor: 60,
     }),
 
@@ -1142,7 +1181,7 @@ export const projectsApi = api.injectEndpoints({
       ],
       onQueryStarted: async (
         { projectId, taskId, task },
-        { dispatch, queryFulfilled }
+        { dispatch, queryFulfilled, getState }
       ) => {
         // Serialize dates for Redux
         const serializedTask = {
@@ -1153,7 +1192,89 @@ export const projectsApi = api.injectEndpoints({
           updatedAt: new Date().toJSON(),
         } as SerializedTask;
 
-        // Update tasks list
+        // For status changes (column moves), handle optimistic updates for kanban view
+        const isStatusChange = "status" in task;
+
+        const state = getState() as any;
+        const tasksQueries = Object.values(state.api.queries).filter(
+          (query: any) =>
+            query?.endpointName === "getTasks" &&
+            (query?.originalArgs === projectId ||
+              (typeof query?.originalArgs === "object" &&
+                query?.originalArgs.projectId === projectId))
+        );
+
+        // Updates for queries with grouped data (kanban board view)
+        const kanbanPatches = isStatusChange
+          ? tasksQueries
+              .map((query: any) => {
+                if (query.data?.groupedByStatus) {
+                  return dispatch(
+                    projectsApi.util.updateQueryData(
+                      "getTasks",
+                      query.originalArgs,
+                      (draft: TasksResponse) => {
+                        if (draft.groupedByStatus) {
+                          // Find the current task in its original status column
+                          let currentTask: Task | undefined;
+                          let originalStatus: string | undefined;
+
+                          // Find task and its current status
+                          for (const [status, tasks] of Object.entries(
+                            draft.groupedByStatus
+                          )) {
+                            const taskIndex = tasks.findIndex(
+                              (t) => t.id === taskId
+                            );
+                            if (taskIndex !== -1) {
+                              currentTask = { ...tasks[taskIndex] };
+                              originalStatus = status;
+                              // Remove from original status column
+                              draft.groupedByStatus[status].splice(
+                                taskIndex,
+                                1
+                              );
+                              break;
+                            }
+                          }
+
+                          // If we found the task and it's moving to a new status
+                          if (currentTask && task.status) {
+                            // Update the task with new data
+                            const updatedTask = {
+                              ...currentTask,
+                              ...task,
+                              dueDate:
+                                serializedTask.dueDate as unknown as Date,
+                              startDate:
+                                serializedTask.startDate as unknown as Date,
+                              completedDate:
+                                serializedTask.completedDate as unknown as Date,
+                              updatedAt:
+                                serializedTask.updatedAt as unknown as Date,
+                            };
+
+                            // Add to the new status column
+                            if (!draft.groupedByStatus[task.status]) {
+                              draft.groupedByStatus[task.status] = [];
+                            }
+
+                            // Add to the beginning of the new column
+                            draft.groupedByStatus[task.status].unshift(
+                              updatedTask
+                            );
+                          }
+                        }
+                      }
+                    )
+                  );
+                }
+                return null;
+              })
+              .filter(Boolean)
+          : [];
+
+        // Update tasks list (standard view)
         const listPatch = dispatch(
           projectsApi.util.updateQueryData("getTasks", projectId, (draft) => {
             const index = draft.data.findIndex((t) => t.id === taskId);
@@ -1194,8 +1315,10 @@ export const projectsApi = api.injectEndpoints({
         try {
           await queryFulfilled;
         } catch {
+          // Undo all patches if the request fails
           listPatch.undo();
           detailPatch.undo();
+          kanbanPatches.forEach((patch) => patch?.undo());
         }
       },
     }),
@@ -1240,6 +1363,86 @@ export const projectsApi = api.injectEndpoints({
         }
       },
     }),
+
+    // Reorder tasks within a column
+    reorderTasks: build.mutation<
+      { success: boolean },
+      {
+        projectId: string;
+        status: "todo" | "in_progress" | "review" | "done";
+        taskIds: string[];
+      }
+    >({
+      query: ({ projectId, status, taskIds }) => ({
+        url: `/projects/${projectId}/tasks/reorder`,
+        method: "POST",
+        body: { status, taskIds },
+      }),
+      invalidatesTags: (result, error, { projectId }) => [
+        { type: "Projects", id: `tasks-${projectId}` },
+      ],
+      onQueryStarted: async (
+        { projectId, status, taskIds },
+        { dispatch, queryFulfilled, getState }
+      ) => {
+        const state = getState() as any;
+        const tasksQueries = Object.values(state.api.queries).filter(
+          (query: any) =>
+            query?.endpointName === "getTasks" &&
+            (query?.originalArgs === projectId ||
+              (typeof query?.originalArgs === "object" &&
+                query?.originalArgs.projectId === projectId))
+        );
+
+        const patches = tasksQueries
+          .map((query: any) => {
+            if (
+              query.data?.groupedByStatus &&
+              query.data.groupedByStatus[status]
+            ) {
+              return dispatch(
+                projectsApi.util.updateQueryData(
+                  "getTasks",
+                  query.originalArgs,
+                  (draft: TasksResponse) => {
+                    if (
+                      draft.groupedByStatus &&
+                      draft.groupedByStatus[status]
+                    ) {
+                      const currentTasks = [...draft.groupedByStatus[status]];
+                      const taskMap = new Map(
+                        currentTasks.map((task) => [task.id, task])
+                      );
+
+                      const newOrderedTasks = taskIds
+                        .map((id) => taskMap.get(id))
+                        .filter((task): task is Task => task !== undefined);
+
+                      const taskIdSet = new Set(taskIds);
+                      const remainingTasks = currentTasks.filter(
+                        (task) => !taskIdSet.has(task.id)
+                      );
+
+                      draft.groupedByStatus[status] = [
+                        ...newOrderedTasks,
+                        ...remainingTasks,
+                      ];
+                    }
+                  }
+                )
+              );
+            }
+            return null;
+          })
+          .filter(Boolean);
+
+        try {
+          await queryFulfilled;
+        } catch {
+          patches.forEach((patch) => patch?.undo());
+        }
+      },
+    }),
   }),
   overrideExisting: false,
 });
@@ -1266,4 +1469,5 @@ export const {
   useCreateTaskMutation,
   useUpdateTaskMutation,
   useDeleteTaskMutation,
+  useReorderTasksMutation,
 } = projectsApi;

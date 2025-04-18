@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { PlusCircle, Loader2, MoreHorizontal } from "lucide-react";
 import { format } from "date-fns";
 
 import { cn } from "@/lib/utils";
+import { useReorderTasksMutation } from "@/lib/redux/projectsApi";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -46,6 +47,8 @@ export function TaskBoard({
   const [isLoading, setIsLoading] = useState(false);
   const [loadingTaskId, setLoadingTaskId] = useState<string | null>(null);
 
+  const [reorderTasks] = useReorderTasksMutation();
+
   useEffect(() => {
     distributeTasksToColumns(initialTasks);
   }, [initialTasks]);
@@ -69,6 +72,54 @@ export function TaskBoard({
     setColumns(newColumns);
   };
 
+  // Save column order
+  const saveColumnOrder = useCallback(
+    async (columnId: string, taskIds: string[]) => {
+      if (taskIds.length === 0) return;
+
+      try {
+        // Apply the change optimistically first
+        setColumns((prevColumns) => {
+          return prevColumns.map((column) => {
+            if (column.id === columnId) {
+              // Build a map of tasks by ID
+              const tasksMap = new Map(
+                column.tasks.map((task) => [task.id, task])
+              );
+
+              // Create the new ordered array
+              const orderedTasks = taskIds
+                .map((id) => tasksMap.get(id))
+                .filter(Boolean) as Task[];
+
+              // Add any tasks that might be missing
+              column.tasks.forEach((task) => {
+                if (!taskIds.includes(task.id)) {
+                  orderedTasks.push(task);
+                }
+              });
+
+              return { ...column, tasks: orderedTasks };
+            }
+            return column;
+          });
+        });
+
+        // Then send to the server
+        await reorderTasks({
+          projectId,
+          status: columnId as "todo" | "in_progress" | "review" | "done",
+          taskIds,
+        });
+      } catch (error) {
+        console.error("Failed to save column order:", error);
+        // Restore original order by refreshing from props
+        distributeTasksToColumns(initialTasks);
+      }
+    },
+    [projectId, reorderTasks, initialTasks]
+  );
+
   const handleDragEnd = async (result: any) => {
     const { source, destination, draggableId } = result;
 
@@ -86,8 +137,29 @@ export function TaskBoard({
     const task = initialTasks.find((t) => t.id === draggableId);
     if (!task) return;
 
-    // If the column changed, update the task status
-    if (source.droppableId !== destination.droppableId) {
+    // If moving within the same column (reordering)
+    if (source.droppableId === destination.droppableId) {
+      const newColumns = [...columns];
+      const columnIndex = newColumns.findIndex(
+        (col) => col.id === source.droppableId
+      );
+
+      if (columnIndex !== -1) {
+        const column = newColumns[columnIndex];
+        const [removed] = column.tasks.splice(source.index, 1);
+        column.tasks.splice(destination.index, 0, removed);
+
+        // Apply the visual update immediately
+        setColumns(newColumns);
+
+        // Get the new order of task IDs
+        const taskIds = column.tasks.map((task) => task.id);
+
+        // Save the new order to the backend
+        await saveColumnOrder(column.id, taskIds);
+      }
+    } else {
+      // Moving between columns (status change)
       const newStatus = destination.droppableId;
 
       // Update locally first for better UX
@@ -101,6 +173,10 @@ export function TaskBoard({
         const sourceColumn = newColumns[sourceColumnIndex];
         const taskToMove = sourceColumn.tasks[source.index];
         sourceColumn.tasks.splice(source.index, 1);
+
+        // Save source column order after removing task
+        const sourceTaskIds = sourceColumn.tasks.map((task) => task.id);
+        saveColumnOrder(sourceColumn.id, sourceTaskIds);
       }
 
       // Add task to destination column
@@ -111,33 +187,24 @@ export function TaskBoard({
         const destinationColumn = newColumns[destinationColumnIndex];
         const updatedTask = { ...task, status: newStatus as any };
         destinationColumn.tasks.splice(destination.index, 0, updatedTask);
+
+        // Save destination column order after adding task
+        const destTaskIds = destinationColumn.tasks.map((task) => task.id);
+        saveColumnOrder(destinationColumn.id, destTaskIds);
       }
 
+      // Update the UI immediately
       setColumns(newColumns);
       setLoadingTaskId(draggableId);
 
       try {
-        // Call the API to update the task
+        // Call the API to update the task status
         await onTaskMove(draggableId, newStatus);
       } catch (error) {
-        // If there's an error, revert to original task distribution
         console.error("Failed to update task status:", error);
         distributeTasksToColumns(initialTasks);
       } finally {
         setLoadingTaskId(null);
-      }
-    } else {
-      // Just reorder within the same column
-      const newColumns = [...columns];
-      const columnIndex = newColumns.findIndex(
-        (col) => col.id === source.droppableId
-      );
-
-      if (columnIndex !== -1) {
-        const column = newColumns[columnIndex];
-        const [removed] = column.tasks.splice(source.index, 1);
-        column.tasks.splice(destination.index, 0, removed);
-        setColumns(newColumns);
       }
     }
   };

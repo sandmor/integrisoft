@@ -7,10 +7,11 @@ import {
   milestones,
   activitiesFeed,
 } from "@/lib/db/schema";
-import { eq, and, not, sql, desc } from "drizzle-orm";
+import { eq, and, not, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { createId } from "@paralleldrive/cuid2";
+import { TaskStatus, moveTaskBetweenColumns } from "@/lib/db/kanban-order";
 
 // GET /api/projects/[projectId]/tasks/[taskId] - Get a single task
 export async function GET(
@@ -44,6 +45,7 @@ export async function GET(
         createdAt: tasks.createdAt,
         updatedAt: tasks.updatedAt,
         milestoneId: tasks.milestoneId,
+        projectId: tasks.projectId,
         assigneeName: sql`CASE WHEN ${employees.id} IS NOT NULL THEN concat(${users.name}, ' ', ${users.lastName}) ELSE NULL END`,
         milestoneName: milestones.name,
       })
@@ -108,82 +110,89 @@ export async function PATCH(
     const { projectId, taskId } = await params;
     const data = await req.json();
 
-    // Check if task exists and belongs to the project
-    const [existingTask] = await db
-      .select({
-        id: tasks.id,
-        title: tasks.title,
-        assignedToId: tasks.assignedToId,
-        status: tasks.status,
+    // Get the current task to check if status is changing
+    const currentTask = await db.query.tasks.findFirst({
+      where: and(
+        eq(tasks.id, taskId),
+        eq(tasks.projectId, projectId),
+        not(eq(tasks.isDeleted, true))
+      ),
+    });
+
+    if (!currentTask) {
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    }
+
+    // Check if status is changing to handle kanban order updates
+    const isStatusChanging = data.status && data.status !== currentTask.status;
+
+    const oldStatus = currentTask.status as TaskStatus;
+    const newStatus = data.status as TaskStatus | undefined;
+
+    // Update the task in the database
+    const [updatedTask] = await db
+      .update(tasks)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+        // If status is changing to "done" and completedDate is not set, set it to now
+        ...(data.status === "done" &&
+        !data.completedDate &&
+        !currentTask.completedDate
+          ? { completedDate: new Date() }
+          : {}),
       })
-      .from(tasks)
       .where(
         and(
           eq(tasks.id, taskId),
           eq(tasks.projectId, projectId),
           not(eq(tasks.isDeleted, true))
         )
-      );
-
-    if (!existingTask) {
-      return NextResponse.json(
-        { error: "Task not found or does not belong to this project" },
-        { status: 404 }
-      );
-    }
-
-    // Prepare update data
-    const updateData: any = {
-      ...data,
-      updatedAt: new Date(),
-    };
-
-    // If marking as complete and no completedDate is provided, set it
-    if (data.status === "done" && !data.completedDate) {
-      updateData.completedDate = new Date();
-    }
-
-    // Update task
-    const [updatedTask] = await db
-      .update(tasks)
-      .set(updateData)
-      .where(eq(tasks.id, taskId))
+      )
       .returning();
 
-    // Record relevant activities
-    // 1. Status change
-    if (data.status && data.status !== existingTask.status) {
+    if (!updatedTask) {
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    }
+
+    // Handle kanban board ordering if the status changed
+    if (isStatusChanging && newStatus) {
+      await moveTaskBetweenColumns(projectId, taskId, oldStatus, newStatus);
+    }
+
+    // Log activity for status change
+    if (isStatusChanging) {
       await db.insert(activitiesFeed).values({
         id: createId(),
         userId: session.user.id,
-        action: "update_status",
+        action: "status-change",
         module: "tasks",
-        description: `Task "${existingTask.title}" status changed to ${data.status}`,
-        projectId: projectId,
-        taskId: taskId,
+        description: `Task "${updatedTask.title}" status changed from ${oldStatus} to ${newStatus}`,
+        projectId,
+        taskId,
         timestamp: new Date(),
         isSystem: false,
       });
     }
 
-    // 2. Assignment change
-    if (data.assignedToId && data.assignedToId !== existingTask.assignedToId) {
+    // Log activity for assignment change
+    if (data.assignedToId && data.assignedToId !== currentTask.assignedToId) {
       await db.insert(activitiesFeed).values({
         id: createId(),
         userId: session.user.id,
-        action: "reassign",
+        action: "assign",
         module: "tasks",
-        description: `Task "${existingTask.title}" was reassigned`,
-        projectId: projectId,
-        taskId: taskId,
+        description: `Task "${updatedTask.title}" was assigned`,
+        projectId,
+        taskId,
         employeeId: data.assignedToId,
         timestamp: new Date(),
         isSystem: false,
       });
     }
 
-    // Get updated task with assignee information
-    const taskWithAssignee = await db
+    // Get task with updated details to return
+    const taskWithDetails = await db
       .select({
         id: tasks.id,
         title: tasks.title,
@@ -199,6 +208,7 @@ export async function PATCH(
         createdAt: tasks.createdAt,
         updatedAt: tasks.updatedAt,
         milestoneId: tasks.milestoneId,
+        projectId: tasks.projectId,
         assigneeName: sql`CASE WHEN ${employees.id} IS NOT NULL THEN concat(${users.name}, ' ', ${users.lastName}) ELSE NULL END`,
         milestoneName: milestones.name,
       })
@@ -211,17 +221,17 @@ export async function PATCH(
 
     // Format the response
     const formattedTask = {
-      ...taskWithAssignee,
-      assignee: taskWithAssignee.assignedToId
+      ...taskWithDetails,
+      assignee: taskWithDetails.assignedToId
         ? {
-            id: taskWithAssignee.assignedToId,
-            name: taskWithAssignee.assigneeName || `Unknown Employee`,
+            id: taskWithDetails.assignedToId,
+            name: taskWithDetails.assigneeName || `Unknown Employee`,
           }
         : null,
-      milestone: taskWithAssignee.milestoneId
+      milestone: taskWithDetails.milestoneId
         ? {
-            id: taskWithAssignee.milestoneId,
-            name: taskWithAssignee.milestoneName || `Unknown Milestone`,
+            id: taskWithDetails.milestoneId,
+            name: taskWithDetails.milestoneName || `Unknown Milestone`,
           }
         : null,
     };
@@ -252,13 +262,28 @@ export async function DELETE(
 
     const { projectId, taskId } = await params;
 
-    // Check if task exists and belongs to the project
-    const [existingTask] = await db
-      .select({
-        id: tasks.id,
-        title: tasks.title,
+    // Get the task before deletion to know its status
+    const taskToDelete = await db.query.tasks.findFirst({
+      where: and(
+        eq(tasks.id, taskId),
+        eq(tasks.projectId, projectId),
+        not(eq(tasks.isDeleted, true))
+      ),
+    });
+
+    if (!taskToDelete) {
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    }
+
+    const status = taskToDelete.status as TaskStatus;
+
+    // Soft delete the task by setting isDeleted to true
+    await db
+      .update(tasks)
+      .set({
+        isDeleted: true,
+        updatedAt: new Date(),
       })
-      .from(tasks)
       .where(
         and(
           eq(tasks.id, taskId),
@@ -267,31 +292,17 @@ export async function DELETE(
         )
       );
 
-    if (!existingTask) {
-      return NextResponse.json(
-        { error: "Task not found or does not belong to this project" },
-        { status: 404 }
-      );
-    }
+    // Remove the task ID from the kanban board order arrays
+    await moveTaskBetweenColumns(projectId, taskId, status, status);
 
-    // Soft delete task
-    await db
-      .update(tasks)
-      .set({
-        isDeleted: true,
-        updatedAt: new Date(),
-      })
-      .where(eq(tasks.id, taskId));
-
-    // Record the activity
+    // Log deletion activity
     await db.insert(activitiesFeed).values({
       id: createId(),
       userId: session.user.id,
       action: "delete",
       module: "tasks",
-      description: `Task "${existingTask.title}" was deleted`,
-      projectId: projectId,
-      taskId: taskId,
+      description: `Task "${taskToDelete.title}" was deleted`,
+      projectId,
       timestamp: new Date(),
       isSystem: false,
     });

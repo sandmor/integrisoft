@@ -1194,6 +1194,11 @@ export const projectsApi = api.injectEndpoints({
 
         // For status changes (column moves), handle optimistic updates for kanban view
         const isStatusChange = "status" in task;
+        // Track if we need to handle position index explicitly
+        const hasPositionInfo =
+          isStatusChange &&
+          "positionIndex" in task &&
+          task.positionIndex !== undefined;
 
         const state = getState() as any;
         const tasksQueries = Object.values(state.api.queries).filter(
@@ -1259,10 +1264,26 @@ export const projectsApi = api.injectEndpoints({
                               draft.groupedByStatus[task.status] = [];
                             }
 
-                            // Add to the beginning of the new column
-                            draft.groupedByStatus[task.status].unshift(
-                              updatedTask
-                            );
+                            // Place the task at the specific position index if provided
+                            // Otherwise place at the beginning
+                            if (
+                              hasPositionInfo &&
+                              typeof task.positionIndex === "number"
+                            ) {
+                              const posIndex = Math.min(
+                                Math.max(0, task.positionIndex),
+                                draft.groupedByStatus[task.status].length
+                              );
+                              draft.groupedByStatus[task.status].splice(
+                                posIndex,
+                                0,
+                                updatedTask
+                              );
+                            } else {
+                              draft.groupedByStatus[task.status].unshift(
+                                updatedTask
+                              );
+                            }
                           }
                         }
                       }

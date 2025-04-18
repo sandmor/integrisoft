@@ -7,7 +7,10 @@ import { PlusCircle, Loader2, MoreHorizontal } from "lucide-react";
 import { format } from "date-fns";
 
 import { cn } from "@/lib/utils";
-import { useReorderTasksMutation } from "@/lib/redux/projectsApi";
+import {
+  useReorderTasksMutation,
+  useUpdateTaskMutation,
+} from "@/lib/redux/projectsApi";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -30,13 +33,19 @@ type Column = {
 type TaskBoardProps = {
   projectId: string;
   initialTasks: Task[];
-  onTaskMove: (taskId: string, newStatus: string) => Promise<void>;
+  onTaskMove: (
+    taskId: string,
+    newStatus: string,
+    destinationIndex?: number
+  ) => Promise<void>;
+  isDisabled?: boolean;
 };
 
 export function TaskBoard({
   projectId,
   initialTasks,
   onTaskMove,
+  isDisabled = false,
 }: TaskBoardProps) {
   const [columns, setColumns] = useState<Column[]>([
     { id: "todo", title: "To Do", tasks: [] },
@@ -48,6 +57,7 @@ export function TaskBoard({
   const [loadingTaskId, setLoadingTaskId] = useState<string | null>(null);
 
   const [reorderTasks] = useReorderTasksMutation();
+  const [updateTask] = useUpdateTaskMutation();
 
   useEffect(() => {
     distributeTasksToColumns(initialTasks);
@@ -121,6 +131,9 @@ export function TaskBoard({
   );
 
   const handleDragEnd = async (result: any) => {
+    // Prevent dragging if the board is disabled
+    if (isDisabled) return;
+
     const { source, destination, draggableId } = result;
 
     // Dropped outside the list
@@ -155,56 +168,52 @@ export function TaskBoard({
         // Get the new order of task IDs
         const taskIds = column.tasks.map((task) => task.id);
 
-        // Save the new order to the backend
+        // Save the new order to the backend - this is necessary for reordering within the same column
         await saveColumnOrder(column.id, taskIds);
       }
     } else {
       // Moving between columns (status change)
       const newStatus = destination.droppableId;
+      const destinationIndex = destination.index;
 
-      // Update locally first for better UX
+      // Update locally first for better UX - with exact position
       const newColumns = [...columns];
 
       // Remove task from source column
       const sourceColumnIndex = newColumns.findIndex(
         (col) => col.id === source.droppableId
       );
+
       if (sourceColumnIndex !== -1) {
         const sourceColumn = newColumns[sourceColumnIndex];
-        const taskToMove = sourceColumn.tasks[source.index];
+        const taskToMove = {
+          ...sourceColumn.tasks[source.index],
+          status: newStatus as any,
+        };
         sourceColumn.tasks.splice(source.index, 1);
 
-        // Save source column order after removing task
-        const sourceTaskIds = sourceColumn.tasks.map((task) => task.id);
-        saveColumnOrder(sourceColumn.id, sourceTaskIds);
-      }
+        // Add task to destination column at exact index
+        const destinationColumnIndex = newColumns.findIndex(
+          (col) => col.id === newStatus
+        );
 
-      // Add task to destination column
-      const destinationColumnIndex = newColumns.findIndex(
-        (col) => col.id === destination.droppableId
-      );
-      if (destinationColumnIndex !== -1) {
-        const destinationColumn = newColumns[destinationColumnIndex];
-        const updatedTask = { ...task, status: newStatus as any };
-        destinationColumn.tasks.splice(destination.index, 0, updatedTask);
+        if (destinationColumnIndex !== -1) {
+          const destinationColumn = newColumns[destinationColumnIndex];
+          destinationColumn.tasks.splice(destinationIndex, 0, taskToMove);
 
-        // Save destination column order after adding task
-        const destTaskIds = destinationColumn.tasks.map((task) => task.id);
-        saveColumnOrder(destinationColumn.id, destTaskIds);
-      }
+          // Update the UI immediately
+          setColumns(newColumns);
+          setLoadingTaskId(draggableId);
 
-      // Update the UI immediately
-      setColumns(newColumns);
-      setLoadingTaskId(draggableId);
-
-      try {
-        // Call the API to update the task status
-        await onTaskMove(draggableId, newStatus);
-      } catch (error) {
-        console.error("Failed to update task status:", error);
-        distributeTasksToColumns(initialTasks);
-      } finally {
-        setLoadingTaskId(null);
+          try {
+            await onTaskMove(draggableId, newStatus, destinationIndex);
+          } catch (error) {
+            console.error("Failed to update task status:", error);
+            distributeTasksToColumns(initialTasks);
+          } finally {
+            setLoadingTaskId(null);
+          }
+        }
       }
     }
   };
@@ -223,7 +232,12 @@ export function TaskBoard({
   };
 
   return (
-    <div className="w-full overflow-auto">
+    <div
+      className={cn(
+        "w-full overflow-auto",
+        isDisabled && "opacity-70 pointer-events-none"
+      )}
+    >
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="flex gap-4 pb-4 min-w-[800px]">
           {columns.map((column) => (
@@ -235,7 +249,7 @@ export function TaskBoard({
                 </Badge>
               </div>
 
-              <Droppable droppableId={column.id}>
+              <Droppable droppableId={column.id} isDropDisabled={isDisabled}>
                 {(provided) => (
                   <div
                     ref={provided.innerRef}

@@ -66,6 +66,23 @@ export async function getOrderedTasksForColumn(
 }
 
 /**
+ * Get the ordered task IDs for a specific column
+ */
+export async function getOrderedTaskIdsForColumn(
+  projectId: string,
+  status: TaskStatus
+): Promise<string[]> {
+  const orderRecord = await db.query.kanbanBoardOrder.findFirst({
+    where: and(
+      eq(kanbanBoardOrder.projectId, projectId),
+      eq(kanbanBoardOrder.status, status)
+    ),
+  });
+
+  return orderRecord?.orderedTaskIds || [];
+}
+
+/**
  * Update the custom order of tasks for a specific column
  */
 export async function updateTaskOrderForColumn(
@@ -210,4 +227,60 @@ export async function reorderTasksInColumn(
 
   // Update the order
   await updateTaskOrderForColumn(projectId, status, validOrder);
+}
+
+/**
+ * Moves a task from one column to another and places it at a specific position
+ * This respects the exact position where the user dropped the task
+ */
+export async function moveTaskBetweenColumnsWithPosition(
+  projectId: string,
+  taskId: string,
+  fromStatus: TaskStatus,
+  toStatus: TaskStatus,
+  toPosition: number
+): Promise<void> {
+  // Get current orders for both columns
+  const [fromOrder, toOrder] = await Promise.all([
+    getOrderedTaskIdsForColumn(projectId, fromStatus),
+    getOrderedTaskIdsForColumn(projectId, toStatus),
+  ]);
+
+  // Remove from source column
+  const newFromOrder = fromOrder.filter((id) => id !== taskId);
+
+  // Create a new destination order array without the task ID (in case it's already there)
+  const cleanToOrder = toOrder.filter((id) => id !== taskId);
+
+  // Insert the task at the exact position
+  const newToOrder = [...cleanToOrder];
+  // Make sure position is within bounds
+  const safePosition = Math.min(Math.max(0, toPosition), cleanToOrder.length);
+  newToOrder.splice(safePosition, 0, taskId);
+
+  // Update both columns atomically if possible
+  await Promise.all([
+    db
+      .insert(kanbanBoardOrder)
+      .values({
+        projectId,
+        status: fromStatus,
+        orderedTaskIds: newFromOrder,
+      })
+      .onConflictDoUpdate({
+        target: [kanbanBoardOrder.projectId, kanbanBoardOrder.status],
+        set: { orderedTaskIds: newFromOrder },
+      }),
+    db
+      .insert(kanbanBoardOrder)
+      .values({
+        projectId,
+        status: toStatus,
+        orderedTaskIds: newToOrder,
+      })
+      .onConflictDoUpdate({
+        target: [kanbanBoardOrder.projectId, kanbanBoardOrder.status],
+        set: { orderedTaskIds: newToOrder },
+      }),
+  ]);
 }

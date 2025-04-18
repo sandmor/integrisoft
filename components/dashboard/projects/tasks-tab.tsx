@@ -4,7 +4,14 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, LayoutGrid, List, Filter, Calendar } from "lucide-react";
+import {
+  Plus,
+  LayoutGrid,
+  List,
+  Filter,
+  Calendar,
+  Loader2,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -36,10 +43,12 @@ export function TasksTab({ projectId }: TasksTabProps) {
     status: ["todo", "in_progress", "review", "done"],
     priority: [1, 2, 3],
   });
+  const [isManuallyLoading, setIsManuallyLoading] = useState(false);
 
   const {
     data: tasksData,
     isLoading,
+    isFetching,
     isError,
     error: fetchError,
     refetch,
@@ -47,6 +56,8 @@ export function TasksTab({ projectId }: TasksTabProps) {
     projectId,
     orderByStatus: view === "board", // Request column-ordered tasks for board view
   });
+
+  const isTasksLoading = isLoading || isFetching || isManuallyLoading;
 
   const [updateTask] = useUpdateTaskMutation();
 
@@ -66,14 +77,30 @@ export function TasksTab({ projectId }: TasksTabProps) {
     refetch();
   }, [view, refetch]);
 
-  const handleTaskMove = async (taskId: string, newStatus: string) => {
+  const handleTaskMove = async (
+    taskId: string,
+    newStatus: string,
+    destinationIndex?: number
+  ) => {
+    if (isTasksLoading) {
+      toast.error("Please wait until the current operation completes");
+      return Promise.reject(new Error("Operation in progress"));
+    }
+
     try {
+      // Set manual loading state immediately to show spinner
+      setIsManuallyLoading(true);
+
       const validStatus = newStatus as
         | "todo"
         | "in_progress"
         | "review"
         | "done";
-      const taskUpdate = { status: validStatus };
+      const taskUpdate = {
+        status: validStatus,
+        positionIndex:
+          destinationIndex !== undefined ? destinationIndex : undefined,
+      };
 
       await updateTask({
         projectId,
@@ -85,6 +112,8 @@ export function TasksTab({ projectId }: TasksTabProps) {
     } catch (error) {
       toast.error("Failed to update task");
       throw error;
+    } finally {
+      setIsManuallyLoading(false);
     }
   };
 
@@ -239,22 +268,34 @@ export function TasksTab({ projectId }: TasksTabProps) {
               </Button>
             </div>
           ) : (
-            <TaskBoard
-              projectId={projectId}
-              initialTasks={
-                tasksData?.groupedByStatus
-                  ? Object.entries(tasksData.groupedByStatus).flatMap(
-                      ([status, statusTasks]) =>
-                        filters.status.includes(status)
-                          ? statusTasks.filter((task) =>
-                              filters.priority.includes(task.priority)
-                            )
-                          : []
-                    )
-                  : filteredTasks
-              }
-              onTaskMove={handleTaskMove}
-            />
+            <div className="relative min-h-[500px]">
+              {/* Improved overlay positioning */}
+              {isTasksLoading && (
+                <div className="absolute inset-0 bg-background/60 z-10 flex items-center justify-center">
+                  <div className="bg-background shadow-lg rounded-md p-4 flex items-center gap-2">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    <span>Refreshing tasks...</span>
+                  </div>
+                </div>
+              )}
+              <TaskBoard
+                projectId={projectId}
+                initialTasks={
+                  tasksData?.groupedByStatus
+                    ? Object.entries(tasksData.groupedByStatus).flatMap(
+                        ([status, statusTasks]) =>
+                          filters.status.includes(status)
+                            ? statusTasks.filter((task) =>
+                                filters.priority.includes(task.priority)
+                              )
+                            : []
+                      )
+                    : filteredTasks
+                }
+                onTaskMove={handleTaskMove}
+                isDisabled={isTasksLoading}
+              />
+            </div>
           )}
         </TabsContent>
 

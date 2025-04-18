@@ -11,7 +11,11 @@ import { eq, and, not, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { createId } from "@paralleldrive/cuid2";
-import { TaskStatus, moveTaskBetweenColumns } from "@/lib/db/kanban-order";
+import {
+  TaskStatus,
+  moveTaskBetweenColumns,
+  moveTaskBetweenColumnsWithPosition,
+} from "@/lib/db/kanban-order";
 
 // GET /api/projects/[projectId]/tasks/[taskId] - Get a single task
 export async function GET(
@@ -110,38 +114,10 @@ export async function PATCH(
     const { projectId, taskId } = await params;
     const data = await req.json();
 
-    // Get the current task to check if status is changing
-    const currentTask = await db.query.tasks.findFirst({
-      where: and(
-        eq(tasks.id, taskId),
-        eq(tasks.projectId, projectId),
-        not(eq(tasks.isDeleted, true))
-      ),
-    });
-
-    if (!currentTask) {
-      return NextResponse.json({ error: "Task not found" }, { status: 404 });
-    }
-
-    // Check if status is changing to handle kanban order updates
-    const isStatusChanging = data.status && data.status !== currentTask.status;
-
-    const oldStatus = currentTask.status as TaskStatus;
-    const newStatus = data.status as TaskStatus | undefined;
-
-    // Update the task in the database
-    const [updatedTask] = await db
-      .update(tasks)
-      .set({
-        ...data,
-        updatedAt: new Date(),
-        // If status is changing to "done" and completedDate is not set, set it to now
-        ...(data.status === "done" &&
-        !data.completedDate &&
-        !currentTask.completedDate
-          ? { completedDate: new Date() }
-          : {}),
-      })
+    // Find the current task data to check for status changes
+    const currentTask = await db
+      .select()
+      .from(tasks)
       .where(
         and(
           eq(tasks.id, taskId),
@@ -149,49 +125,64 @@ export async function PATCH(
           not(eq(tasks.isDeleted, true))
         )
       )
-      .returning();
+      .then((rows) => rows[0]);
 
-    if (!updatedTask) {
+    if (!currentTask) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
-    // Handle kanban board ordering if the status changed
-    if (isStatusChanging && newStatus) {
-      await moveTaskBetweenColumns(projectId, taskId, oldStatus, newStatus);
+    // Handle status changes with position index for kanban board
+    if (data.status && data.status !== currentTask.status) {
+      // If position index is provided, insert at specific position
+      if (data.positionIndex !== undefined) {
+        await moveTaskBetweenColumnsWithPosition(
+          projectId,
+          taskId,
+          currentTask.status as TaskStatus,
+          data.status as TaskStatus,
+          data.positionIndex
+        );
+      } else {
+        // Otherwise, just move it to the new column (default behavior)
+        await moveTaskBetweenColumns(
+          projectId,
+          taskId,
+          currentTask.status as TaskStatus,
+          data.status as TaskStatus
+        );
+      }
     }
 
-    // Log activity for status change
-    if (isStatusChanging) {
-      await db.insert(activitiesFeed).values({
-        id: createId(),
-        userId: session.user.id,
-        action: "status-change",
-        module: "tasks",
-        description: `Task "${updatedTask.title}" status changed from ${oldStatus} to ${newStatus}`,
-        projectId,
-        taskId,
-        timestamp: new Date(),
-        isSystem: false,
-      });
+    // If task is completed, set the completedDate
+    if (data.status === "done" && currentTask.status !== "done") {
+      data.completedDate = data.completedDate || new Date();
     }
 
-    // Log activity for assignment change
-    if (data.assignedToId && data.assignedToId !== currentTask.assignedToId) {
-      await db.insert(activitiesFeed).values({
-        id: createId(),
-        userId: session.user.id,
-        action: "assign",
-        module: "tasks",
-        description: `Task "${updatedTask.title}" was assigned`,
-        projectId,
-        taskId,
-        employeeId: data.assignedToId,
-        timestamp: new Date(),
-        isSystem: false,
-      });
+    // If task is moved out of done, clear completedDate
+    if (
+      data.status &&
+      data.status !== "done" &&
+      currentTask.status === "done"
+    ) {
+      data.completedDate = null;
     }
 
-    // Get task with updated details to return
+    // Remove the positionIndex from data as it's not a column in the tasks table
+    if ("positionIndex" in data) {
+      delete data.positionIndex;
+    }
+
+    // Update the task
+    const [updatedTask] = await db
+      .update(tasks)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(tasks.id, taskId))
+      .returning();
+
+    // Get complete task data with assignee and milestone information
     const taskWithDetails = await db
       .select({
         id: tasks.id,
@@ -219,7 +210,7 @@ export async function PATCH(
       .where(eq(tasks.id, taskId))
       .then((rows) => rows[0]);
 
-    // Format the response
+    // Format the response data
     const formattedTask = {
       ...taskWithDetails,
       assignee: taskWithDetails.assignedToId
@@ -236,8 +227,22 @@ export async function PATCH(
         : null,
     };
 
-    // Use consistent format with data property
-    return NextResponse.json({ data: formattedTask });
+    // Record an activity for status change
+    if (data.status && data.status !== currentTask.status) {
+      await db.insert(activitiesFeed).values({
+        id: createId(),
+        userId: session.user.id,
+        action: "update",
+        module: "tasks",
+        description: `Task "${currentTask.title}" status changed from "${currentTask.status}" to "${data.status}"`,
+        projectId: projectId,
+        taskId: taskId,
+        timestamp: new Date(),
+        isSystem: true,
+      });
+    }
+
+    return NextResponse.json(formattedTask);
   } catch (error) {
     console.error("Error updating task:", error);
     return NextResponse.json(

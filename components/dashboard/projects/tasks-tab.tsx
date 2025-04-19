@@ -54,18 +54,16 @@ export function TasksTab({ projectId }: TasksTabProps) {
     refetch,
   } = useGetTasksQuery({
     projectId,
-    orderByStatus: view === "board", // Request column-ordered tasks for board view
+    orderByStatus: view === "board",
   });
 
   const isTasksLoading = isLoading || isFetching || isManuallyLoading;
-
   const [updateTask] = useUpdateTaskMutation();
 
-  // Extract tasks based on the response format
   const tasks = tasksData
     ? Array.isArray(tasksData.data)
       ? tasksData.data
-      : Object.values(tasksData.groupedByStatus || {}).flat()
+      : Object.values(tasksData.data).flat()
     : [];
 
   const error = isError
@@ -281,8 +279,8 @@ export function TasksTab({ projectId }: TasksTabProps) {
               <TaskBoard
                 projectId={projectId}
                 initialTasks={
-                  tasksData?.groupedByStatus
-                    ? Object.entries(tasksData.groupedByStatus).flatMap(
+                  !Array.isArray(tasksData?.data)
+                    ? Object.entries(tasksData?.data || {}).flatMap(
                         ([status, statusTasks]) =>
                           filters.status.includes(status)
                             ? statusTasks.filter((task) =>

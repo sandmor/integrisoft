@@ -137,9 +137,8 @@ export interface Task {
 
 // New type for tasks response with grouped by status data
 export interface TasksResponse {
-  data: Task[];
+  data: Task[] | Record<string, Task[]>;
   count: number;
-  groupedByStatus?: Record<string, Task[]>;
 }
 
 // Type for task response (single task)
@@ -1049,8 +1048,8 @@ export const projectsApi = api.injectEndpoints({
         // Extract all task ids for tagging
         const taskIds = Array.isArray(result.data)
           ? result.data.map((task) => task.id)
-          : Object.values(result.groupedByStatus || {}).flatMap((tasks) =>
-              tasks.map((task) => task.id)
+          : Object.values(result.data).flatMap((tasks: any) =>
+              tasks.map((task: any) => task.id)
             );
 
         return [
@@ -1066,9 +1065,8 @@ export const projectsApi = api.injectEndpoints({
           // Handle kanban grouped by status format
           const allTasks = Object.values(response.data).flat();
           return {
-            data: allTasks,
+            data: response.data, // Keep the grouped structure under data
             count: allTasks.length,
-            groupedByStatus: response.data,
           };
         }
         return response;
@@ -1136,7 +1134,16 @@ export const projectsApi = api.injectEndpoints({
         // Add to tasks list
         const patchResult = dispatch(
           projectsApi.util.updateQueryData("getTasks", projectId, (draft) => {
-            draft.data.unshift(optimisticTask);
+            if (Array.isArray(draft.data)) {
+              draft.data.unshift(optimisticTask);
+            } else {
+              // When data is grouped by status, add to the correct status column
+              const status = optimisticTask.status;
+              if (!draft.data[status]) {
+                draft.data[status] = [];
+              }
+              draft.data[status].unshift(optimisticTask);
+            }
             draft.count = (draft.count || 0) + 1;
           })
         );
@@ -1147,9 +1154,22 @@ export const projectsApi = api.injectEndpoints({
           // Replace with actual data
           dispatch(
             projectsApi.util.updateQueryData("getTasks", projectId, (draft) => {
-              const index = draft.data.findIndex((t) => t.id === tempId);
-              if (index !== -1) {
-                draft.data[index] = createdTask;
+              if (Array.isArray(draft.data)) {
+                const index = draft.data.findIndex((t) => t.id === tempId);
+                if (index !== -1) {
+                  draft.data[index] = createdTask;
+                }
+              } else {
+                // For grouped data structure
+                const status = createdTask.status;
+                if (draft.data[status]) {
+                  const index = draft.data[status].findIndex(
+                    (t) => t.id === tempId
+                  );
+                  if (index !== -1) {
+                    draft.data[status][index] = createdTask;
+                  }
+                }
               }
             })
           );
@@ -1213,32 +1233,29 @@ export const projectsApi = api.injectEndpoints({
         const kanbanPatches = isStatusChange
           ? tasksQueries
               .map((query: any) => {
-                if (query.data?.groupedByStatus) {
+                if (!Array.isArray(query.data?.data)) {
                   return dispatch(
                     projectsApi.util.updateQueryData(
                       "getTasks",
                       query.originalArgs,
                       (draft: TasksResponse) => {
-                        if (draft.groupedByStatus) {
+                        if (!Array.isArray(draft.data)) {
                           // Find the current task in its original status column
                           let currentTask: Task | undefined;
                           let originalStatus: string | undefined;
 
                           // Find task and its current status
                           for (const [status, tasks] of Object.entries(
-                            draft.groupedByStatus
+                            draft.data
                           )) {
                             const taskIndex = tasks.findIndex(
-                              (t) => t.id === taskId
+                              (t: Task) => t.id === taskId
                             );
                             if (taskIndex !== -1) {
                               currentTask = { ...tasks[taskIndex] };
                               originalStatus = status;
                               // Remove from original status column
-                              draft.groupedByStatus[status].splice(
-                                taskIndex,
-                                1
-                              );
+                              draft.data[status].splice(taskIndex, 1);
                               break;
                             }
                           }
@@ -1260,8 +1277,8 @@ export const projectsApi = api.injectEndpoints({
                             };
 
                             // Add to the new status column
-                            if (!draft.groupedByStatus[task.status]) {
-                              draft.groupedByStatus[task.status] = [];
+                            if (!draft.data[task.status]) {
+                              draft.data[task.status] = [];
                             }
 
                             // Place the task at the specific position index if provided
@@ -1272,17 +1289,15 @@ export const projectsApi = api.injectEndpoints({
                             ) {
                               const posIndex = Math.min(
                                 Math.max(0, task.positionIndex),
-                                draft.groupedByStatus[task.status].length
+                                draft.data[task.status].length
                               );
-                              draft.groupedByStatus[task.status].splice(
+                              draft.data[task.status].splice(
                                 posIndex,
                                 0,
                                 updatedTask
                               );
                             } else {
-                              draft.groupedByStatus[task.status].unshift(
-                                updatedTask
-                              );
+                              draft.data[task.status].unshift(updatedTask);
                             }
                           }
                         }
@@ -1298,16 +1313,19 @@ export const projectsApi = api.injectEndpoints({
         // Update tasks list (standard view)
         const listPatch = dispatch(
           projectsApi.util.updateQueryData("getTasks", projectId, (draft) => {
-            const index = draft.data.findIndex((t) => t.id === taskId);
-            if (index !== -1) {
-              draft.data[index] = {
-                ...draft.data[index],
-                ...task,
-                dueDate: serializedTask.dueDate as unknown as Date,
-                startDate: serializedTask.startDate as unknown as Date,
-                completedDate: serializedTask.completedDate as unknown as Date,
-                updatedAt: serializedTask.updatedAt as unknown as Date,
-              };
+            if (Array.isArray(draft.data)) {
+              const index = draft.data.findIndex((t: Task) => t.id === taskId);
+              if (index !== -1) {
+                draft.data[index] = {
+                  ...draft.data[index],
+                  ...task,
+                  dueDate: serializedTask.dueDate as unknown as Date,
+                  startDate: serializedTask.startDate as unknown as Date,
+                  completedDate:
+                    serializedTask.completedDate as unknown as Date,
+                  updatedAt: serializedTask.updatedAt as unknown as Date,
+                };
+              }
             }
           })
         );
@@ -1361,10 +1379,24 @@ export const projectsApi = api.injectEndpoints({
         // Remove from tasks list
         const listPatch = dispatch(
           projectsApi.util.updateQueryData("getTasks", projectId, (draft) => {
-            const index = draft.data.findIndex((t) => t.id === taskId);
-            if (index !== -1) {
-              draft.data.splice(index, 1);
-              draft.count = Math.max(0, (draft.count || 0) - 1);
+            if (Array.isArray(draft.data)) {
+              const index = draft.data.findIndex((t: Task) => t.id === taskId);
+              if (index !== -1) {
+                draft.data.splice(index, 1);
+                draft.count = Math.max(0, (draft.count || 0) - 1);
+              }
+            } else {
+              // Handle grouped data structure
+              for (const status in draft.data) {
+                const index = draft.data[status].findIndex(
+                  (t: Task) => t.id === taskId
+                );
+                if (index !== -1) {
+                  draft.data[status].splice(index, 1);
+                  draft.count = Math.max(0, (draft.count || 0) - 1);
+                  break;
+                }
+              }
             }
           })
         );
@@ -1417,20 +1449,14 @@ export const projectsApi = api.injectEndpoints({
 
         const patches = tasksQueries
           .map((query: any) => {
-            if (
-              query.data?.groupedByStatus &&
-              query.data.groupedByStatus[status]
-            ) {
+            if (!Array.isArray(query.data?.data) && query.data?.data[status]) {
               return dispatch(
                 projectsApi.util.updateQueryData(
                   "getTasks",
                   query.originalArgs,
                   (draft: TasksResponse) => {
-                    if (
-                      draft.groupedByStatus &&
-                      draft.groupedByStatus[status]
-                    ) {
-                      const currentTasks = [...draft.groupedByStatus[status]];
+                    if (!Array.isArray(draft.data) && draft.data[status]) {
+                      const currentTasks = [...draft.data[status]];
                       const taskMap = new Map(
                         currentTasks.map((task) => [task.id, task])
                       );
@@ -1444,7 +1470,7 @@ export const projectsApi = api.injectEndpoints({
                         (task) => !taskIdSet.has(task.id)
                       );
 
-                      draft.groupedByStatus[status] = [
+                      draft.data[status] = [
                         ...newOrderedTasks,
                         ...remainingTasks,
                       ];

@@ -82,9 +82,11 @@ export function MilestoneForm({
       const milestone = {
         name: values.name,
         description: values.description ?? null,
-        dueDate: values.dueDate,
+        dueDate: values.dueDate.toISOString(),
         isCompleted: values.isCompleted,
-        completedDate: values.completedDate ?? null,
+        completedDate: values.completedDate
+          ? values.completedDate.toISOString()
+          : null,
       };
 
       if (milestoneId) {

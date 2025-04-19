@@ -92,7 +92,7 @@ export const columns: ColumnDef<ProjectTableItem>[] = [
     enableSorting: true,
     cell: ({ row }) => {
       const date = row.getValue("startDate") as string | null;
-      return <span>{date ? formatDate(new Date(date)) : "Not scheduled"}</span>;
+      return <span>{date ? formatDate(date) : "Not scheduled"}</span>;
     },
   },
   {
@@ -101,7 +101,7 @@ export const columns: ColumnDef<ProjectTableItem>[] = [
     enableSorting: true,
     cell: ({ row }) => {
       const date = row.getValue("targetEndDate") as string | null;
-      return <span>{date ? formatDate(new Date(date)) : "Not set"}</span>;
+      return <span>{date ? formatDate(date) : "Not set"}</span>;
     },
   },
   {

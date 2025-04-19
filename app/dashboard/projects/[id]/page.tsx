@@ -37,7 +37,7 @@ function formatStatus(status: string) {
 }
 
 // Helper function to format date
-function formatDate(date: Date | null) {
+function formatDate(date: string | undefined) {
   if (!date) return "Not set";
   return format(new Date(date), "MMMM d, yyyy");
 }
@@ -178,6 +178,12 @@ export default async function ProjectDetailsPage({ params }: ProjectPageProps) {
                       {project.milestones.length} total,{" "}
                       {project.milestones.filter((m) => m.isCompleted).length}{" "}
                       completed
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Tasks</p>
+                    <p className="text-sm font-medium">
+                      {project.tasks.count} total
                     </p>
                   </div>
                 </div>

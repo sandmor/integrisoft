@@ -142,7 +142,11 @@ export function TaskForm({
     try {
       const formattedValues = {
         ...values,
-        priority: values.priority ? (values.priority as 1 | 2 | 3) : undefined,
+        priority: (values.priority ?? 2) as 1 | 2 | 3,
+        startDate: values.startDate
+          ? values.startDate.toISOString()
+          : values.startDate,
+        dueDate: values.dueDate ? values.dueDate.toISOString() : values.dueDate,
       };
 
       if (isEdit && task) {

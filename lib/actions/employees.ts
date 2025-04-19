@@ -33,7 +33,7 @@ export type Employee = {
   email: string;
   department: string | null;
   position: string | null;
-  hireDate: Date;
+  hireDate: string;
   salary: number | null;
   contactEmail: string | null;
   contactPhone: string | null;
@@ -233,7 +233,7 @@ export async function getEmployees(options?: {
       email: employee.email || "N/A",
       department: employee.department || null,
       position: employee.position || null,
-      hireDate: employee.hireDate,
+      hireDate: employee.hireDate.toISOString(),
       salary: employee.salary ? Number(employee.salary) : null,
       contactEmail: employee.contactEmail || null,
       contactPhone: employee.contactPhone || null,
@@ -270,7 +270,7 @@ export async function getEmployee(id: string): Promise<Employee | null> {
       email: result.users?.email || "N/A",
       department: result.departments?.name || null,
       position: result.positions?.title || null,
-      hireDate: result.hireDate,
+      hireDate: result.hireDate.toISOString(),
       salary: result.salary ? Number(result.salary) : null,
       contactEmail: result.contactEmail || null,
       contactPhone: result.contactPhone || null,

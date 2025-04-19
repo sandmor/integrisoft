@@ -4,8 +4,13 @@ import { api } from "./redux/api";
 
 export const makeStore = () => {
   const store = configureStore({
-    reducer: {
-      [api.reducerPath]: api.reducer,
+    reducer: (state, action) => {
+      if (action.type === "REPLACE_STATE") {
+        return action.payload;
+      }
+      return {
+        [api.reducerPath]: api.reducer(state?.[api.reducerPath], action),
+      };
     },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware().concat(api.middleware),

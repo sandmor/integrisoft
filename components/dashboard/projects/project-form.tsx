@@ -163,8 +163,12 @@ export function ProjectForm({
       const projectData = {
         ...values,
         budget: numericBudget,
-        startDate: values.startDate || undefined,
-        targetEndDate: values.targetEndDate || undefined,
+        startDate: values.startDate
+          ? values.startDate.toISOString()
+          : undefined,
+        targetEndDate: values.targetEndDate
+          ? values.targetEndDate.toISOString()
+          : undefined,
       };
 
       if (isEditMode) {

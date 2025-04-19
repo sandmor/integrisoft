@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   Plus,
@@ -30,50 +29,88 @@ import {
   useGetTasksQuery,
   useUpdateTaskMutation,
   Task,
+  projectsApi,
 } from "@/lib/redux/projectsApi";
+import { useAppDispatch } from "@/lib/hooks";
 
 type TasksTabProps = {
   projectId: string;
+  initialData?: any;
 };
 
-export function TasksTab({ projectId }: TasksTabProps) {
-  const router = useRouter();
+export function TasksTab({ projectId, initialData }: TasksTabProps) {
   const [view, setView] = useState("board");
   const [filters, setFilters] = useState({
     status: ["todo", "in_progress", "review", "done"],
     priority: [1, 2, 3],
   });
   const [isManuallyLoading, setIsManuallyLoading] = useState(false);
+  const dispatch = useAppDispatch();
 
   const {
     data: tasksData,
-    isLoading,
+    isLoading: isLoadingQuery,
     isFetching,
     isError,
     error: fetchError,
     refetch,
-  } = useGetTasksQuery({
-    projectId,
-    orderByStatus: view === "board",
-  });
+  } = useGetTasksQuery(
+    {
+      projectId,
+      orderByStatus: true, // Always request tasks grouped by status for proper ordering
+    },
+    {
+      // Skip the initial query if data is already provided by the server
+      skip: initialData !== undefined,
+    }
+  );
 
+  useEffect(() => {
+    // If initialData is provided, set it in the store
+    if (initialData) {
+      console.log("Setting initial data in store:", initialData);
+      dispatch(
+        projectsApi.util.upsertQueryData(
+          "getTasks",
+          { projectId, orderByStatus: true },
+          initialData
+        )
+      );
+    }
+  }, [initialData, projectId]);
+
+  // Adjust loading state to account for initial hydration
+  const isLoading = initialData ? false : isLoadingQuery;
   const isTasksLoading = isLoading || isFetching || isManuallyLoading;
   const [updateTask] = useUpdateTaskMutation();
 
-  const tasks = tasksData
-    ? Array.isArray(tasksData.data)
-      ? tasksData.data
-      : Object.values(tasksData.data).flat()
-    : [];
+  // Create a flattened version of the grouped tasks for list and calendar views
+  const flattenedTasks = useMemo(() => {
+    if (!tasksData?.data) return [];
+
+    // If data is already flat (fallback case), return as is
+    if (Array.isArray(tasksData.data)) return tasksData.data;
+
+    // If data is grouped, flatten it
+    return Object.values(tasksData.data).flat();
+  }, [tasksData]);
+
+  // Apply filters to the appropriate data format based on the current view
+  const filteredTasks = useMemo(() => {
+    // For board view, we'll use the grouped data structure (applied in the TaskBoard component)
+    if (view === "board") return flattenedTasks;
+
+    // For list and calendar views, we'll use the flattened data with filters applied
+    return flattenedTasks.filter(
+      (task: Task) =>
+        filters.status.includes(task.status) &&
+        filters.priority.includes(task.priority)
+    );
+  }, [flattenedTasks, filters, view]);
 
   const error = isError
     ? (fetchError as any)?.data?.error || "Failed to load tasks"
     : null;
-
-  // Refetch when view changes to get the appropriate data format
-  useEffect(() => {
-    refetch();
-  }, [view, refetch]);
 
   const handleTaskMove = async (
     taskId: string,
@@ -114,12 +151,6 @@ export function TasksTab({ projectId }: TasksTabProps) {
       setIsManuallyLoading(false);
     }
   };
-
-  const filteredTasks = tasks.filter(
-    (task: Task) =>
-      filters.status.includes(task.status) &&
-      filters.priority.includes(task.priority)
-  );
 
   const toggleFilter = (type: "status" | "priority", value: any) => {
     setFilters((prev) => {

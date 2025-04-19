@@ -262,8 +262,30 @@ export async function getClientById(id: string) {
   return {
     ...client,
     contacts,
-    projects: clientProjects,
-    interactions,
+    projects: clientProjects.map((project) => ({
+      ...project,
+      startDate: project.startDate ? project.startDate.toISOString() : null,
+      targetEndDate: project.targetEndDate
+        ? project.targetEndDate.toISOString()
+        : null,
+    })),
+    interactions: interactions.map((interaction) => ({
+      ...interaction,
+      date: interaction.date.toISOString(),
+      followUpDate: interaction.followUpDate
+        ? interaction.followUpDate.toISOString()
+        : null,
+      employee: {
+        ...interaction.employee,
+        name: interaction.employee.name,
+      },
+      contact: interaction.contact
+        ? {
+            ...interaction.contact,
+            name: `${interaction.contact.firstName} ${interaction.contact.lastName}`,
+          }
+        : null,
+    })),
   };
 }
 

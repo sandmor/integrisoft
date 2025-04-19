@@ -9,13 +9,15 @@ import {
   projects,
   users,
   projectTeamMembers,
+  tasks,
 } from "@/lib/db/schema";
-import { eq, not, and } from "drizzle-orm";
+import { eq, not, and, sql } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { notFound } from "next/navigation";
+import { TaskStatus, getOrderedTasksForColumn } from "@/lib/db/kanban-order";
 
 // Type definition for project data
 export type ProjectData = {
@@ -191,14 +193,80 @@ export async function getProject(id: string) {
     .leftJoin(users, eq(employees.userId, users.id))
     .orderBy(users.name);
 
+  // Get tasks for kanban board view, organized by status columns
+  const statusList: TaskStatus[] = ["todo", "in_progress", "review", "done"];
+
+  // Create a result object to hold tasks for each status
+  const tasksResult: Record<string, any[]> = {};
+  let totalCount = 0;
+
+  // Get tasks for each status column with proper ordering
+  for (const status of statusList) {
+    const columnTasks = await getOrderedTasksForColumn(id, status);
+
+    // Get assignee and milestone information for these tasks
+    const tasksWithDetails = await Promise.all(
+      columnTasks.map(async (task) => {
+        let assignee = null;
+        let milestone = null;
+
+        if (task.assignedToId) {
+          const assigneeData = await db
+            .select({
+              id: employees.id,
+              name: sql`concat(${users.name}, ' ', ${users.lastName})`,
+            })
+            .from(employees)
+            .leftJoin(users, eq(employees.userId, users.id))
+            .where(eq(employees.id, task.assignedToId))
+            .then((rows) => rows[0]);
+
+          if (assigneeData) {
+            assignee = {
+              id: assigneeData.id,
+              name: assigneeData.name || "Unknown Employee",
+            };
+          }
+        }
+
+        if (task.milestoneId) {
+          const milestoneData = await db
+            .select({
+              id: milestones.id,
+              name: milestones.name,
+            })
+            .from(milestones)
+            .where(eq(milestones.id, task.milestoneId))
+            .then((rows) => rows[0]);
+
+          if (milestoneData) {
+            milestone = {
+              id: milestoneData.id,
+              name: milestoneData.name,
+            };
+          }
+        }
+
+        return {
+          ...task,
+          assignee,
+          milestone,
+        };
+      })
+    );
+
+    tasksResult[status] = tasksWithDetails;
+    totalCount += tasksWithDetails.length;
+  }
+
   return {
     id: project.id,
     name: project.name,
     description: project.description,
     status: project.status,
-    startDate: project.startDate,
-    targetEndDate: project.targetEndDate,
-    actualEndDate: project.actualEndDate,
+    startDate: project.startDate?.toISOString(),
+    targetEndDate: project.targetEndDate?.toISOString(),
+    actualEndDate: project.actualEndDate?.toISOString(),
     client: project.clientId
       ? {
           id: project.clientId,
@@ -211,23 +279,35 @@ export async function getProject(id: string) {
           name: project.managerName + " " + project.managerLastName,
         }
       : null,
-    milestones: projectMilestones,
+    milestones: projectMilestones.map((milestone) => ({
+      ...milestone,
+      dueDate: milestone.dueDate ? milestone.dueDate.toISOString() : null,
+      completedDate: milestone.completedDate
+        ? milestone.completedDate.toISOString()
+        : null,
+    })),
     budget: project.budget,
-    product: {
-      id: project.productId,
-      name: project.productName,
-    },
-    createdAt: project.createdAt,
-    updatedAt: project.updatedAt,
+    product: project.productId
+      ? {
+          id: project.productId,
+          name: project.productName,
+        }
+      : null,
+    createdAt: project.createdAt.toISOString(),
+    updatedAt: project.updatedAt.toISOString(),
     teamMembers: teamMembers.map((member) => ({
       id: member.id,
       employeeId: member.employeeId,
       name: `${member.employeeName} ${member.employeeLastName}`,
       role: member.role,
       allocationPercentage: member.allocationPercentage,
-      startDate: member.startDate,
-      endDate: member.endDate,
+      startDate: member.startDate.toISOString(),
+      endDate: member.endDate ? member.endDate.toISOString() : null,
     })),
+    tasks: {
+      data: tasksResult,
+      count: totalCount,
+    },
   };
 }
 

@@ -147,7 +147,8 @@ export function TeamMemberForm({
     try {
       const teamMemberData = {
         ...values,
-        endDate: values.endDate === undefined ? null : values.endDate,
+        startDate: values.startDate.toISOString(),
+        endDate: values.endDate ? values.endDate.toISOString() : null,
       };
 
       if (teamMemberId) {

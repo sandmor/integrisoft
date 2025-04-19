@@ -1,10 +1,7 @@
 import { api } from "./api";
 
-type TypeSafeUpdate<T> = {
-  [K in keyof T]?: T[K] extends Date | null | undefined
-    ? Date | null | undefined
-    : T[K];
-};
+// Updated to simplify types since all fields use the same types now
+type TypeSafeUpdate<T> = Partial<T>;
 
 export interface Client {
   id: string;
@@ -12,8 +9,8 @@ export interface Client {
   email?: string;
   phone?: string;
   status: "active" | "inactive";
-  createdAt?: Date;
-  updatedAt?: Date;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface PaginatedResponse<T> {
@@ -95,8 +92,8 @@ export const clientsApi = api.injectEndpoints({
         const optimisticClient = {
           ...newClient,
           id: tempId,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         } as Client;
 
         const patchResult = dispatch(
@@ -140,20 +137,18 @@ export const clientsApi = api.injectEndpoints({
         { type: "Clients", id: "LIST" },
       ],
       onQueryStarted: async ({ id, client }, { dispatch, queryFulfilled }) => {
-        const safeUpdate = { ...client, updatedAt: new Date() };
-
         const listPatch = dispatch(
           clientsApi.util.updateQueryData("getClients", {}, (draft) => {
             const index = draft.data.findIndex((c) => c.id === id);
             if (index !== -1) {
-              draft.data[index] = { ...draft.data[index], ...safeUpdate };
+              draft.data[index] = { ...draft.data[index], ...client };
             }
           })
         );
 
         const detailPatch = dispatch(
           clientsApi.util.updateQueryData("getClientById", id, (draft) => {
-            return { ...draft, ...safeUpdate };
+            return { ...draft, ...client };
           })
         );
 

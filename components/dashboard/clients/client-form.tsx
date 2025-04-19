@@ -88,7 +88,7 @@ export function ClientForm({ client, accountManagers }: ClientFormProps) {
       if (isEditing && client) {
         await updateClient({
           id: client.id,
-          ...data,
+          client: data,
         }).unwrap();
         toast.success("Client updated successfully");
         router.push(`/dashboard/clients/${client.id}`);

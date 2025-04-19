@@ -1,65 +1,13 @@
 import { api } from "./api";
 
-// Helper type for handling model updates with proper date typing
-type TypeSafeUpdate<T> = {
-  [K in keyof T]?: T[K] extends Date | null | undefined
-    ? Date | null | undefined
-    : T[K];
-};
-
-// Interfaces for Redux store
-export interface SerializedProject
-  extends Omit<
-    Project,
-    | "startDate"
-    | "targetEndDate"
-    | "actualEndDate"
-    | "createdAt"
-    | "updatedAt"
-    | "milestones"
-    | "teamMembers"
-  > {
-  startDate: string | null;
-  targetEndDate?: string | null;
-  actualEndDate?: string | null;
-  createdAt?: string;
-  updatedAt?: string;
-  milestones?: SerializedMilestone[];
-  teamMembers?: SerializedTeamMember[];
-}
-
-export interface SerializedTeamMember
-  extends Omit<TeamMember, "startDate" | "endDate"> {
-  startDate: string | null;
-  endDate: string | null;
-}
-
-export interface SerializedMilestone
-  extends Omit<Milestone, "dueDate" | "completedDate"> {
-  dueDate: string | null;
-  completedDate: string | null;
-}
-
-export interface SerializedTask
-  extends Omit<
-    Task,
-    "dueDate" | "startDate" | "completedDate" | "createdAt" | "updatedAt"
-  > {
-  dueDate: string | null;
-  startDate: string | null;
-  completedDate: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface Project {
   id: string;
   name: string;
   description?: string | null;
   status: "planning" | "active" | "on_hold" | "completed" | "cancelled";
-  startDate: Date | null;
-  targetEndDate?: Date | null;
-  actualEndDate?: Date | null;
+  startDate: string | null;
+  targetEndDate?: string | null;
+  actualEndDate?: string | null;
   client?: {
     id: string;
     name: string;
@@ -72,8 +20,8 @@ export interface Project {
   budget?: number;
   taskCount?: number;
   progress?: number;
-  createdAt?: Date;
-  updatedAt?: Date;
+  createdAt?: string;
+  updatedAt?: string;
   milestones?: Milestone[];
   teamMembers?: TeamMember[];
   product?: {
@@ -96,16 +44,16 @@ export interface TeamMember {
   name: string;
   role: string;
   allocationPercentage: number;
-  startDate: Date | null;
-  endDate: Date | null;
+  startDate: string | null;
+  endDate: string | null;
 }
 
 export interface Milestone {
   id: string;
   name: string;
   description: string | null;
-  dueDate: Date | null;
-  completedDate: Date | null;
+  dueDate: string | null;
+  completedDate: string | null;
   isCompleted: boolean;
 }
 
@@ -115,13 +63,13 @@ export interface Task {
   description?: string | null;
   status: "todo" | "in_progress" | "review" | "done";
   priority: 1 | 2 | 3; // 1: Low, 2: Medium, 3: High
-  dueDate?: Date | null;
-  startDate?: Date | null;
+  dueDate?: string | null;
+  startDate?: string | null;
   estimatedHours?: number | null;
   actualHours?: number | null;
-  completedDate?: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
+  completedDate?: string | null;
+  createdAt: string;
+  updatedAt: string;
   projectId: string;
   assignedToId?: string | null;
   milestoneId?: string | null;
@@ -234,9 +182,9 @@ export const projectsApi = api.injectEndpoints({
         const optimisticProject = {
           ...newProject,
           id: tempId,
-          startDate: newProject.startDate?.toJSON() || null,
-          targetEndDate: newProject.targetEndDate?.toJSON() || null,
-          actualEndDate: newProject.actualEndDate?.toJSON() || null,
+          startDate: newProject.startDate,
+          targetEndDate: newProject.targetEndDate,
+          actualEndDate: newProject.actualEndDate,
           createdAt: new Date().toJSON(),
           updatedAt: new Date().toJSON(),
         } as unknown as Project;
@@ -267,22 +215,13 @@ export const projectsApi = api.injectEndpoints({
         try {
           const { data: createdProject } = await queryFulfilled;
 
-          const serializedProject = {
-            ...createdProject,
-            startDate: createdProject.startDate?.toJSON() || null,
-            targetEndDate: createdProject.targetEndDate?.toJSON() || null,
-            actualEndDate: createdProject.actualEndDate?.toJSON() || null,
-            createdAt: createdProject.createdAt?.toJSON(),
-            updatedAt: createdProject.updatedAt?.toJSON(),
-          } as unknown as Project;
-
           // Replace optimistic entry with actual data
           dispatch(
             projectsApi.util.updateQueryData("getProjects", {}, (draft) => {
               const index = draft.data.findIndex(
                 (project) => project.id === tempId
               );
-              if (index !== -1) draft.data[index] = serializedProject;
+              if (index !== -1) draft.data[index] = createdProject;
             })
           );
 
@@ -295,7 +234,7 @@ export const projectsApi = api.injectEndpoints({
                   const index = draft.data.findIndex(
                     (project) => project.id === tempId
                   );
-                  if (index !== -1) draft.data[index] = serializedProject;
+                  if (index !== -1) draft.data[index] = createdProject;
                 }
               )
             );
@@ -318,14 +257,6 @@ export const projectsApi = api.injectEndpoints({
         { type: "Projects", id: "LIST" },
       ],
       onQueryStarted: async (updatedProject, { dispatch, queryFulfilled }) => {
-        const serializedProject = {
-          ...updatedProject,
-          startDate: updatedProject.startDate?.toJSON() || null,
-          targetEndDate: updatedProject.targetEndDate?.toJSON() || null,
-          actualEndDate: updatedProject.actualEndDate?.toJSON() || null,
-          updatedAt: new Date().toJSON(),
-        } as unknown as Project;
-
         // Update projects list
         const listPatch = dispatch(
           projectsApi.util.updateQueryData("getProjects", {}, (draft) => {
@@ -335,7 +266,7 @@ export const projectsApi = api.injectEndpoints({
             if (index !== -1)
               draft.data[index] = {
                 ...draft.data[index],
-                ...serializedProject,
+                ...updatedProject,
               };
           })
         );
@@ -346,7 +277,7 @@ export const projectsApi = api.injectEndpoints({
             "getProjectById",
             updatedProject.id,
             (draft) => {
-              Object.assign(draft, { ...draft, ...serializedProject });
+              Object.assign(draft, { ...draft, ...updatedProject });
             }
           )
         );
@@ -365,7 +296,7 @@ export const projectsApi = api.injectEndpoints({
                 if (index !== -1)
                   draft.data[index] = {
                     ...draft.data[index],
-                    ...serializedProject,
+                    ...updatedProject,
                   };
               }
             )
@@ -497,10 +428,8 @@ export const projectsApi = api.injectEndpoints({
       ) => {
         const tempId = Date.now().toString();
 
-        const serializedTeamMember = {
+        const newTeamMember = {
           ...teamMember,
-          startDate: teamMember.startDate?.toJSON() || null,
-          endDate: teamMember.endDate?.toJSON() || null,
           id: tempId,
           name: "Loading...",
         } as unknown as TeamMember;
@@ -511,7 +440,7 @@ export const projectsApi = api.injectEndpoints({
             "getTeamMembers",
             projectId,
             (draft) => {
-              draft.push(serializedTeamMember);
+              draft.push(newTeamMember);
             }
           )
         );
@@ -523,9 +452,9 @@ export const projectsApi = api.injectEndpoints({
             projectId,
             (draft) => {
               if (draft.teamMembers) {
-                draft.teamMembers.push(serializedTeamMember);
+                draft.teamMembers.push(newTeamMember);
               } else {
-                draft.teamMembers = [serializedTeamMember];
+                draft.teamMembers = [newTeamMember];
               }
             }
           )
@@ -534,20 +463,13 @@ export const projectsApi = api.injectEndpoints({
         try {
           const { data: createdTeamMember } = await queryFulfilled;
 
-          // Replace with actual data
-          const serializedResponse = {
-            ...createdTeamMember,
-            startDate: createdTeamMember.startDate?.toJSON() || null,
-            endDate: createdTeamMember.endDate?.toJSON() || null,
-          } as unknown as TeamMember;
-
           dispatch(
             projectsApi.util.updateQueryData(
               "getTeamMembers",
               projectId,
               (draft) => {
                 const index = draft.findIndex((member) => member.id === tempId);
-                if (index !== -1) draft[index] = serializedResponse;
+                if (index !== -1) draft[index] = createdTeamMember;
               }
             )
           );
@@ -562,7 +484,7 @@ export const projectsApi = api.injectEndpoints({
                     (member) => member.id === tempId
                   );
                   if (index !== -1)
-                    draft.teamMembers[index] = serializedResponse;
+                    draft.teamMembers[index] = createdTeamMember;
                 }
               }
             )
@@ -595,12 +517,10 @@ export const projectsApi = api.injectEndpoints({
         { projectId, teamMemberId, teamMember },
         { dispatch, queryFulfilled }
       ) => {
-        const serializedTeamMember: SerializedTeamMember = {
+        const updatedTeamMember = {
           ...(teamMember as any),
           id: teamMemberId,
           name: "Loading...",
-          startDate: teamMember.startDate?.toJSON() || null,
-          endDate: teamMember.endDate?.toJSON() || null,
         };
 
         // Update team members list
@@ -616,8 +536,8 @@ export const projectsApi = api.injectEndpoints({
                 draft[index] = {
                   ...draft[index],
                   ...teamMember,
-                  startDate: serializedTeamMember.startDate as unknown as Date,
-                  endDate: serializedTeamMember.endDate as unknown as Date,
+                  startDate: updatedTeamMember.startDate,
+                  endDate: updatedTeamMember.endDate,
                 };
               }
             }
@@ -633,8 +553,8 @@ export const projectsApi = api.injectEndpoints({
               Object.assign(draft, {
                 ...draft,
                 ...teamMember,
-                startDate: serializedTeamMember.startDate as unknown as Date,
-                endDate: serializedTeamMember.endDate as unknown as Date,
+                startDate: updatedTeamMember.startDate,
+                endDate: updatedTeamMember.endDate,
               });
             }
           )
@@ -654,9 +574,8 @@ export const projectsApi = api.injectEndpoints({
                   draft.teamMembers[index] = {
                     ...draft.teamMembers[index],
                     ...teamMember,
-                    startDate:
-                      serializedTeamMember.startDate as unknown as Date,
-                    endDate: serializedTeamMember.endDate as unknown as Date,
+                    startDate: updatedTeamMember.startDate,
+                    endDate: updatedTeamMember.endDate,
                   };
                 }
               }
@@ -785,8 +704,6 @@ export const projectsApi = api.injectEndpoints({
         const optimisticMilestone = {
           ...milestone,
           id: tempId,
-          dueDate: milestone.dueDate?.toJSON() || null,
-          completedDate: milestone.completedDate?.toJSON() || null,
         } as unknown as Milestone;
 
         // Add to milestones list
@@ -818,20 +735,13 @@ export const projectsApi = api.injectEndpoints({
         try {
           const { data: createdMilestone } = await queryFulfilled;
 
-          // Replace with actual data
-          const serializedMilestone = {
-            ...createdMilestone,
-            dueDate: createdMilestone.dueDate?.toJSON() || null,
-            completedDate: createdMilestone.completedDate?.toJSON() || null,
-          } as unknown as Milestone;
-
           dispatch(
             projectsApi.util.updateQueryData(
               "getMilestones",
               projectId,
               (draft) => {
                 const index = draft.findIndex((item) => item.id === tempId);
-                if (index !== -1) draft[index] = serializedMilestone;
+                if (index !== -1) draft[index] = createdMilestone;
               }
             )
           );
@@ -845,8 +755,7 @@ export const projectsApi = api.injectEndpoints({
                   const index = draft.milestones.findIndex(
                     (item) => item.id === tempId
                   );
-                  if (index !== -1)
-                    draft.milestones[index] = serializedMilestone;
+                  if (index !== -1) draft.milestones[index] = createdMilestone;
                 }
               }
             )
@@ -880,16 +789,6 @@ export const projectsApi = api.injectEndpoints({
         { projectId, milestoneId, milestone },
         { dispatch, queryFulfilled }
       ) => {
-        const serializedMilestone: SerializedMilestone = {
-          ...(milestone as any),
-          id: milestoneId,
-          dueDate: milestone.dueDate?.toJSON() || null,
-          completedDate: milestone.completedDate?.toJSON() || null,
-          name: milestone.name || "",
-          description: milestone.description || null,
-          isCompleted: milestone.isCompleted ?? false,
-        };
-
         // Update milestones list
         const milestonesPatch = dispatch(
           projectsApi.util.updateQueryData(
@@ -901,9 +800,6 @@ export const projectsApi = api.injectEndpoints({
                 draft[index] = {
                   ...draft[index],
                   ...milestone,
-                  dueDate: serializedMilestone.dueDate as unknown as Date,
-                  completedDate:
-                    serializedMilestone.completedDate as unknown as Date,
                 };
               }
             }
@@ -919,9 +815,6 @@ export const projectsApi = api.injectEndpoints({
               Object.assign(draft, {
                 ...draft,
                 ...milestone,
-                dueDate: serializedMilestone.dueDate as unknown as Date,
-                completedDate:
-                  serializedMilestone.completedDate as unknown as Date,
               });
             }
           )
@@ -941,9 +834,6 @@ export const projectsApi = api.injectEndpoints({
                   draft.milestones[index] = {
                     ...draft.milestones[index],
                     ...milestone,
-                    dueDate: serializedMilestone.dueDate as unknown as Date,
-                    completedDate:
-                      serializedMilestone.completedDate as unknown as Date,
                   };
                 }
               }
@@ -1086,9 +976,7 @@ export const projectsApi = api.injectEndpoints({
       Task,
       {
         projectId: string;
-        task: TypeSafeUpdate<
-          Omit<Task, "id" | "projectId" | "createdAt" | "updatedAt">
-        >;
+        task: Omit<Task, "id" | "projectId" | "createdAt" | "updatedAt">;
       }
     >({
       query: ({ projectId, task }) => ({
@@ -1118,8 +1006,8 @@ export const projectsApi = api.injectEndpoints({
           estimatedHours: task.estimatedHours || null,
           actualHours: task.actualHours || null,
           completedDate: task.completedDate || null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
           projectId,
           assignedToId: task.assignedToId || null,
           milestoneId: task.milestoneId || null,
@@ -1184,7 +1072,7 @@ export const projectsApi = api.injectEndpoints({
       {
         projectId: string;
         taskId: string;
-        task: TypeSafeUpdate<
+        task: Partial<
           Omit<Task, "id" | "projectId" | "createdAt" | "updatedAt">
         >;
       }
@@ -1203,15 +1091,6 @@ export const projectsApi = api.injectEndpoints({
         { projectId, taskId, task },
         { dispatch, queryFulfilled, getState }
       ) => {
-        // Serialize dates for Redux
-        const serializedTask = {
-          ...task,
-          dueDate: task.dueDate?.toJSON() || null,
-          startDate: task.startDate?.toJSON() || null,
-          completedDate: task.completedDate?.toJSON() || null,
-          updatedAt: new Date().toJSON(),
-        } as SerializedTask;
-
         // For status changes (column moves), handle optimistic updates for kanban view
         const isStatusChange = "status" in task;
         // Track if we need to handle position index explicitly
@@ -1266,14 +1145,6 @@ export const projectsApi = api.injectEndpoints({
                             const updatedTask = {
                               ...currentTask,
                               ...task,
-                              dueDate:
-                                serializedTask.dueDate as unknown as Date,
-                              startDate:
-                                serializedTask.startDate as unknown as Date,
-                              completedDate:
-                                serializedTask.completedDate as unknown as Date,
-                              updatedAt:
-                                serializedTask.updatedAt as unknown as Date,
                             };
 
                             // Add to the new status column
@@ -1319,11 +1190,6 @@ export const projectsApi = api.injectEndpoints({
                 draft.data[index] = {
                   ...draft.data[index],
                   ...task,
-                  dueDate: serializedTask.dueDate as unknown as Date,
-                  startDate: serializedTask.startDate as unknown as Date,
-                  completedDate:
-                    serializedTask.completedDate as unknown as Date,
-                  updatedAt: serializedTask.updatedAt as unknown as Date,
                 };
               }
             }
@@ -1340,11 +1206,6 @@ export const projectsApi = api.injectEndpoints({
                 draft.data = {
                   ...draft.data,
                   ...task,
-                  dueDate: serializedTask.dueDate as unknown as Date,
-                  startDate: serializedTask.startDate as unknown as Date,
-                  completedDate:
-                    serializedTask.completedDate as unknown as Date,
-                  updatedAt: serializedTask.updatedAt as unknown as Date,
                 };
               }
             }

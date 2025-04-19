@@ -330,7 +330,7 @@ export function EmployeeForm({
         email: data.email,
         department: selectedDepartment?.name,
         position: selectedPosition?.title,
-        hireDate: data.hireDate,
+        hireDate: data.hireDate.toISOString(),
         salary: data.salary,
         contactEmail: data.contactEmail || undefined,
         contactPhone: data.contactPhone || undefined,
@@ -341,7 +341,7 @@ export function EmployeeForm({
       if (isEditing && initialData) {
         await updateEmployee({
           id: initialData.id,
-          ...employeeData,
+          employee: employeeData,
         }).unwrap();
       } else {
         await addEmployee(employeeData).unwrap();

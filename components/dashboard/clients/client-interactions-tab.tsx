@@ -90,10 +90,10 @@ type ClientContact = {
 type ClientInteraction = {
   id: string;
   type: string;
-  date: Date;
+  date: string;
   summary: string;
   details: string | null;
-  followUpDate: Date | null;
+  followUpDate: string | null;
   followUpNotes: string | null;
   employee: { id: string | null; name: string | null } | null;
   contact: { id: string; firstName: string; lastName: string } | null;

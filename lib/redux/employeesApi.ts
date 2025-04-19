@@ -1,17 +1,7 @@
 import { api } from "@/lib/redux/api";
 
-type TypeSafeUpdate<T> = {
-  [K in keyof T]?: T[K] extends Date | null | undefined
-    ? Date | null | undefined
-    : T[K];
-};
-
-export interface SerializedEmployee
-  extends Omit<Employee, "hireDate" | "createdAt" | "updatedAt"> {
-  hireDate: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
+// Updated to simplify types since all fields use the same types now
+type TypeSafeUpdate<T> = Partial<T>;
 
 export interface Employee {
   id: string;
@@ -21,10 +11,10 @@ export interface Employee {
   position: string;
   department: string;
   status: "active" | "inactive" | "on-leave";
-  hireDate: Date;
+  hireDate: string;
   userId?: string;
-  createdAt?: Date;
-  updatedAt?: Date;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface PaginatedResponse<T> {
@@ -106,17 +96,12 @@ export const employeesApi = api.injectEndpoints({
       invalidatesTags: [{ type: "Employees", id: "LIST" }],
       onQueryStarted: async (newEmployee, { dispatch, queryFulfilled }) => {
         const tempId = Date.now().toString();
-        const hireDate =
-          newEmployee.hireDate instanceof Date
-            ? newEmployee.hireDate
-            : new Date();
 
         const optimisticEmployee = {
           ...newEmployee,
           id: tempId,
-          hireDate,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         } as Employee;
 
         const patchResult = dispatch(
@@ -165,28 +150,13 @@ export const employeesApi = api.injectEndpoints({
         { id, employee },
         { dispatch, queryFulfilled }
       ) => {
-        const safeUpdate = {
-          ...employee,
-          updatedAt: new Date(),
-          hireDate:
-            employee.hireDate !== undefined
-              ? employee.hireDate || new Date()
-              : undefined,
-        };
-
         const listPatch = dispatch(
           employeesApi.util.updateQueryData("getEmployees", {}, (draft) => {
             const index = draft.data.findIndex((e) => e.id === id);
             if (index !== -1) {
               const updatedEmployee = {
                 ...draft.data[index],
-                ...safeUpdate,
-                hireDate:
-                  safeUpdate.hireDate instanceof Date
-                    ? safeUpdate.hireDate
-                    : safeUpdate.hireDate
-                    ? new Date(safeUpdate.hireDate)
-                    : draft.data[index].hireDate,
+                ...employee,
               };
               draft.data[index] = updatedEmployee;
             }
@@ -197,13 +167,7 @@ export const employeesApi = api.injectEndpoints({
           employeesApi.util.updateQueryData("getEmployeeById", id, (draft) => {
             return {
               ...draft,
-              ...safeUpdate,
-              hireDate:
-                safeUpdate.hireDate instanceof Date
-                  ? safeUpdate.hireDate
-                  : safeUpdate.hireDate
-                  ? new Date(safeUpdate.hireDate)
-                  : draft.hireDate,
+              ...employee,
             };
           })
         );

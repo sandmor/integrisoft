@@ -84,7 +84,7 @@ export function TeamMembersTab({
       .toUpperCase();
   };
 
-  const formatDate = (date: Date | null) => {
+  const formatDate = (date: string | null) => {
     if (!date) return "Present";
     return format(new Date(date), "MMM d, yyyy");
   };

@@ -249,6 +249,13 @@ export async function getProject(id: string) {
 
         return {
           ...task,
+          createdAt: task.createdAt.toISOString(),
+          updatedAt: task.updatedAt.toISOString(),
+          startDate: task.startDate ? task.startDate.toISOString() : null,
+          dueDate: task.dueDate ? task.dueDate.toISOString() : null,
+          completedDate: task.completedDate
+            ? task.completedDate.toISOString()
+            : null,
           assignee,
           milestone,
         };
@@ -285,6 +292,8 @@ export async function getProject(id: string) {
       completedDate: milestone.completedDate
         ? milestone.completedDate.toISOString()
         : null,
+      createdAt: milestone.createdAt.toISOString(),
+      updatedAt: milestone.updatedAt.toISOString(),
     })),
     budget: project.budget,
     product: project.productId

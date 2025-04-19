@@ -30,22 +30,21 @@ import {
   useUpdateTaskMutation,
   Task,
   projectsApi,
+  TasksResponse,
 } from "@/lib/redux/projectsApi";
 import { useAppDispatch } from "@/lib/hooks";
 
 type TasksTabProps = {
   projectId: string;
-  initialData?: any;
 };
 
-export function TasksTab({ projectId, initialData }: TasksTabProps) {
+export function TasksTab({ projectId }: TasksTabProps) {
   const [view, setView] = useState("board");
   const [filters, setFilters] = useState({
     status: ["todo", "in_progress", "review", "done"],
     priority: [1, 2, 3],
   });
   const [isManuallyLoading, setIsManuallyLoading] = useState(false);
-  const dispatch = useAppDispatch();
 
   const {
     data: tasksData,
@@ -54,33 +53,13 @@ export function TasksTab({ projectId, initialData }: TasksTabProps) {
     isError,
     error: fetchError,
     refetch,
-  } = useGetTasksQuery(
-    {
-      projectId,
-      orderByStatus: true, // Always request tasks grouped by status for proper ordering
-    },
-    {
-      // Skip the initial query if data is already provided by the server
-      skip: initialData !== undefined,
-    }
-  );
-
-  useEffect(() => {
-    // If initialData is provided, set it in the store
-    if (initialData) {
-      console.log("Setting initial data in store:", initialData);
-      dispatch(
-        projectsApi.util.upsertQueryData(
-          "getTasks",
-          { projectId, orderByStatus: true },
-          initialData
-        )
-      );
-    }
-  }, [initialData, projectId]);
+  } = useGetTasksQuery({
+    projectId,
+    orderByStatus: true, // Always request tasks grouped by status for proper ordering
+  });
 
   // Adjust loading state to account for initial hydration
-  const isLoading = initialData ? false : isLoadingQuery;
+  const isLoading = isLoadingQuery;
   const isTasksLoading = isLoading || isFetching || isManuallyLoading;
   const [updateTask] = useUpdateTaskMutation();
 

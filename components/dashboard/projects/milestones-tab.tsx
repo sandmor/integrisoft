@@ -10,25 +10,14 @@ import { Spinner } from "@/components/ui/spinner";
 
 type MilestonesTabProps = {
   projectId: string;
-  initialMilestones: Milestone[];
 };
 
-export function MilestonesTab({
-  projectId,
-  initialMilestones,
-}: MilestonesTabProps) {
-  const router = useRouter();
-
+export function MilestonesTab({ projectId }: MilestonesTabProps) {
   const {
     data: milestones,
     isLoading,
     isError,
-  } = useGetMilestonesQuery(projectId, {
-    selectFromResult: (result) => ({
-      ...result,
-      data: result.data || initialMilestones,
-    }),
-  });
+  } = useGetMilestonesQuery(projectId);
 
   return (
     <>
@@ -51,7 +40,7 @@ export function MilestonesTab({
           Error loading milestones. Please try again.
         </div>
       ) : (
-        <MilestoneTimeline milestones={milestones} projectId={projectId} />
+        <MilestoneTimeline milestones={milestones!} projectId={projectId} />
       )}
     </>
   );

@@ -16,6 +16,8 @@ import { format } from "date-fns";
 import { CalendarIcon, FileText, PenSquare } from "lucide-react";
 import { getEmployees, getProject } from "@/lib/actions/projects";
 import { TasksTab } from "@/components/dashboard/projects/tasks-tab";
+import { projects } from "@/lib/db/schema";
+import { ProjectsDataHydratator } from "@/components/dashboard/projects/projects-data-hydratator";
 
 type ProjectPageProps = {
   params: Promise<{
@@ -55,6 +57,11 @@ export default async function ProjectDetailsPage({ params }: ProjectPageProps) {
 
   return (
     <div className="max-w-7xl mx-auto py-6">
+      <ProjectsDataHydratator
+        projectId={id}
+        tasks={project.tasks}
+        milestones={project.milestones}
+      />
       <div className="flex justify-between items-start mb-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{project.name}</h1>
@@ -197,10 +204,7 @@ export default async function ProjectDetailsPage({ params }: ProjectPageProps) {
         </TabsContent>
 
         <TabsContent value="milestones" className="mt-6">
-          <MilestonesTab
-            projectId={id}
-            initialMilestones={project.milestones}
-          />
+          <MilestonesTab projectId={id} />
         </TabsContent>
 
         <TabsContent value="team" className="mt-6">

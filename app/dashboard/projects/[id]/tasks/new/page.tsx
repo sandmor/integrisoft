@@ -8,10 +8,10 @@ type NewTaskPageProps = {
   params: Promise<{
     id: string;
   }>;
-  searchParams: {
+  searchParams: Promise<{
     status?: string;
     dueDate?: string;
-  };
+  }>;
 };
 
 export default async function NewTaskPage({
@@ -19,6 +19,7 @@ export default async function NewTaskPage({
   searchParams,
 }: NewTaskPageProps) {
   const { id } = await params;
+  const { status: providedStatus, dueDate } = await searchParams;
 
   const project = await getProject(id);
 
@@ -29,15 +30,15 @@ export default async function NewTaskPage({
   // Ensure status is one of the valid options
   let status: TaskStatus = "todo";
   if (
-    searchParams.status &&
-    ["todo", "in_progress", "review", "done"].includes(searchParams.status)
+    providedStatus &&
+    ["todo", "in_progress", "review", "done"].includes(providedStatus)
   ) {
-    status = searchParams.status as TaskStatus;
+    status = providedStatus as TaskStatus;
   }
 
   const defaultValues = {
     status,
-    dueDate: searchParams.dueDate ? new Date(searchParams.dueDate) : undefined,
+    dueDate: dueDate ? new Date(dueDate) : undefined,
   };
 
   return (

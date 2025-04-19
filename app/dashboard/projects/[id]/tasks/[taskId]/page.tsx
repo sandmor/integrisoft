@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { tasks, employees, milestones } from "@/lib/db/schema";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, not } from "drizzle-orm";
 import { CalendarDays, Clock, Edit, ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 
@@ -13,7 +13,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -21,14 +20,16 @@ import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 type TaskDetailPageProps = {
-  params: {
+  params: Promise<{
     id: string;
     taskId: string;
-  };
+  }>;
 };
 
 export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
-  const project = await getProject(params.id);
+  const { id, taskId } = await params;
+
+  const project = await getProject(id);
 
   if (!project) {
     notFound();
@@ -36,9 +37,9 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
 
   const task = await db.query.tasks.findFirst({
     where: and(
-      eq(tasks.id, params.taskId),
-      eq(tasks.projectId, params.id),
-      isNull(tasks.isDeleted)
+      eq(tasks.id, taskId),
+      eq(tasks.projectId, id),
+      not(eq(tasks.isDeleted, true))
     ),
     with: {
       milestone: true,
@@ -134,15 +135,13 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
 
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" asChild>
-            <Link href={`/dashboard/projects/${params.id}?tab=tasks`}>
+            <Link href={`/dashboard/projects/${id}?tab=tasks`}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Tasks
             </Link>
           </Button>
           <Button size="sm" asChild>
-            <Link
-              href={`/dashboard/projects/${params.id}/tasks/${task.id}/edit`}
-            >
+            <Link href={`/dashboard/projects/${id}/tasks/${task.id}/edit`}>
               <Edit className="h-4 w-4 mr-2" />
               Edit Task
             </Link>
@@ -189,9 +188,7 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
                     </p>
                   </div>
                   <Button variant="outline" size="sm" asChild>
-                    <Link
-                      href={`/dashboard/projects/${params.id}?tab=milestones`}
-                    >
+                    <Link href={`/dashboard/projects/${id}?tab=milestones`}>
                       View Milestone
                     </Link>
                   </Button>

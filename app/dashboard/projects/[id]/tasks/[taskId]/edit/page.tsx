@@ -1,20 +1,22 @@
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { tasks } from "@/lib/db/schema";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, not } from "drizzle-orm";
 
 import { getProject } from "@/lib/actions/projects";
 import { TaskForm } from "@/components/dashboard/projects/task-form";
 
 type EditTaskPageProps = {
-  params: {
+  params: Promise<{
     id: string;
     taskId: string;
-  };
+  }>;
 };
 
 export default async function EditTaskPage({ params }: EditTaskPageProps) {
-  const project = await getProject(params.id);
+  const { id, taskId } = await params;
+
+  const project = await getProject(id);
 
   if (!project) {
     notFound();
@@ -22,9 +24,9 @@ export default async function EditTaskPage({ params }: EditTaskPageProps) {
 
   const task = await db.query.tasks.findFirst({
     where: and(
-      eq(tasks.id, params.taskId),
-      eq(tasks.projectId, params.id),
-      isNull(tasks.isDeleted)
+      eq(tasks.id, taskId),
+      eq(tasks.projectId, id),
+      not(eq(tasks.isDeleted, true))
     ),
   });
 
@@ -55,7 +57,7 @@ export default async function EditTaskPage({ params }: EditTaskPageProps) {
         <p className="text-muted-foreground">Modify task details</p>
       </div>
 
-      <TaskForm projectId={params.id} task={formattedTask} isEdit />
+      <TaskForm projectId={id} task={formattedTask} isEdit />
     </div>
   );
 }

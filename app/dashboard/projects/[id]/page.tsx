@@ -61,6 +61,7 @@ export default async function ProjectDetailsPage({ params }: ProjectPageProps) {
         projectId={id}
         tasks={project.tasks}
         milestones={project.milestones}
+        teamMembers={project.teamMembers}
       />
       <div className="flex justify-between items-start mb-6">
         <div>
@@ -216,11 +217,7 @@ export default async function ProjectDetailsPage({ params }: ProjectPageProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <TeamMembersTab
-                employees={employees}
-                projectId={id}
-                teamMembers={project.teamMembers || []}
-              />
+              <TeamMembersTab employees={employees} projectId={id} />
             </CardContent>
           </Card>
         </TabsContent>

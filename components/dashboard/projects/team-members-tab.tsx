@@ -53,14 +53,9 @@ type Employee = {
 type TeamMembersTabProps = {
   projectId: string;
   employees: Employee[];
-  teamMembers: TeamMember[];
 };
 
-export function TeamMembersTab({
-  projectId,
-  employees,
-  teamMembers: initialTeamMembers,
-}: TeamMembersTabProps) {
+export function TeamMembersTab({ projectId, employees }: TeamMembersTabProps) {
   const router = useRouter();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -68,7 +63,7 @@ export function TeamMembersTab({
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
 
   const {
-    data: teamMembers = initialTeamMembers,
+    data: teamMembers,
     isLoading,
     refetch,
   } = useGetTeamMembersQuery(projectId);
@@ -130,7 +125,7 @@ export function TeamMembersTab({
     refetch();
   };
 
-  if (isLoading && teamMembers.length === 0) {
+  if (isLoading) {
     return (
       <div className="flex justify-center py-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>

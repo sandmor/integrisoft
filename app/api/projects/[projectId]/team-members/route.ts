@@ -149,8 +149,8 @@ export async function POST(
       name: `${newMember.employeeName} ${newMember.employeeLastName}`,
       role: newMember.role,
       allocationPercentage: newMember.allocationPercentage,
-      startDate: newMember.startDate,
-      endDate: newMember.endDate,
+      startDate: newMember.startDate ? newMember.startDate.toISOString() : null,
+      endDate: newMember.endDate ? newMember.endDate.toISOString() : null,
     });
   } catch (error) {
     console.error("Error adding team member:", error);

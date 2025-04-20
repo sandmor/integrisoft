@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
-import { PlusCircle, Loader2, MoreHorizontal } from "lucide-react";
+import { PlusCircle, Loader2, MoreHorizontal, Bookmark } from "lucide-react";
 import { format } from "date-fns";
 
 import { cn } from "@/lib/utils";
@@ -400,21 +400,32 @@ export function TaskBoard({
                                   ) : null}
                                 </div>
 
-                                {task.assignee && (
-                                  <div className="flex items-center mt-3">
-                                    <Avatar className="h-5 w-5 mr-1">
-                                      <AvatarFallback className="text-[10px]">
-                                        {task.assignee.name
-                                          .split(" ")
-                                          .map((n) => n[0])
-                                          .join("")}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                    <span className="text-xs truncate max-w-[150px]">
-                                      {task.assignee.name}
-                                    </span>
-                                  </div>
-                                )}
+                                <div className="flex items-center justify-between mt-3 gap-2">
+                                  {task.milestone && (
+                                    <div className="flex items-center text-xs">
+                                      <Bookmark className="h-3 w-3 mr-1 text-primary" />
+                                      <span className="truncate max-w-[110px]">
+                                        {task.milestone.name}
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {task.assignee && (
+                                    <div className="flex items-center ml-auto">
+                                      <Avatar className="h-5 w-5 mr-1">
+                                        <AvatarFallback className="text-[10px]">
+                                          {task.assignee.name
+                                            .split(" ")
+                                            .map((n) => n[0])
+                                            .join("")}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <span className="text-xs truncate max-w-[80px]">
+                                        {task.assignee.name}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
                               </CardContent>
                             </Card>
                           </div>

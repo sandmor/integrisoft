@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CalendarDays, MoreHorizontal } from "lucide-react";
+import { CalendarDays, MoreHorizontal, Bookmark } from "lucide-react";
 import { format } from "date-fns";
 
 import { Badge } from "@/components/ui/badge";
@@ -253,9 +253,15 @@ export function TaskList({ projectId, tasks, onStatusChange }: TaskListProps) {
                 </TableCell>
                 <TableCell>
                   {task.milestone ? (
-                    <span className="truncate max-w-[150px]">
-                      {task.milestone.name}
-                    </span>
+                    <div className="flex items-center">
+                      <Bookmark className="h-4 w-4 mr-1 text-primary" />
+                      <Link
+                        href={`/dashboard/projects/${projectId}?tab=milestones`}
+                        className="truncate max-w-[150px] hover:underline"
+                      >
+                        {task.milestone.name}
+                      </Link>
+                    </div>
                   ) : (
                     <span className="text-muted-foreground">None</span>
                   )}

@@ -8,6 +8,7 @@ import {
   ChevronRight,
   MoreHorizontal,
   Plus,
+  Bookmark,
 } from "lucide-react";
 import {
   format,
@@ -341,8 +342,15 @@ export function TaskCalendar({ projectId, tasks }: TaskCalendarProps) {
                       </Badge>
                     </div>
 
+                    {task.milestone && (
+                      <div className="flex items-center mt-2 text-xs text-muted-foreground">
+                        <Bookmark className="h-3.5 w-3.5 mr-1 text-primary" />
+                        <span className="truncate">{task.milestone.name}</span>
+                      </div>
+                    )}
+
                     {task.assignee && (
-                      <div className="flex items-center mt-3">
+                      <div className="flex items-center mt-2">
                         <Avatar className="h-5 w-5 mr-1">
                           <AvatarFallback className="text-[10px]">
                             {task.assignee.name

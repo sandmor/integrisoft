@@ -1,98 +1,23 @@
 import { api } from "./api";
-
-export interface Project {
-  id: string;
-  name: string;
-  description?: string | null;
-  status: "planning" | "active" | "on_hold" | "completed" | "cancelled";
-  startDate: string | null;
-  targetEndDate?: string | null;
-  actualEndDate?: string | null;
-  client?: {
-    id: string;
-    name: string;
-  } | null;
-  clientId?: string;
-  manager?: {
-    id: string | null;
-    name: string | null;
-  } | null;
-  budget?: number;
-  taskCount?: number;
-  progress?: number;
-  createdAt?: string;
-  updatedAt?: string;
-  milestones?: Milestone[];
-  teamMembers?: TeamMember[];
-  product?: {
-    id: string;
-    name: string;
-  } | null;
-}
-
-export interface PaginatedResponse<T> {
-  data: T[];
-  totalCount: number;
-  pageCount: number;
-  page: number;
-  pageSize: number;
-}
-
-export interface TeamMember {
-  id: string;
-  employeeId: string;
-  name: string;
-  role: string;
-  allocationPercentage: number;
-  startDate: string | null;
-  endDate: string | null;
-}
-
-export interface Milestone {
-  id: string;
-  name: string;
-  description: string | null;
-  dueDate: string | null;
-  completedDate: string | null;
-  isCompleted: boolean;
-}
-
-export interface Task {
-  id: string;
-  title: string;
-  description?: string | null;
-  status: "todo" | "in_progress" | "review" | "done";
-  priority: 1 | 2 | 3; // 1: Low, 2: Medium, 3: High
-  dueDate?: string | null;
-  startDate?: string | null;
-  estimatedHours?: number | null;
-  actualHours?: number | null;
-  completedDate?: string | null;
-  createdAt: string;
-  updatedAt: string;
-  projectId: string;
-  assignedToId?: string | null;
-  milestoneId?: string | null;
-  assignee?: {
-    id: string;
-    name: string;
-  } | null;
-  milestone?: {
-    id: string;
-    name: string;
-  } | null;
-}
-
-// New type for tasks response with grouped by status data
-export interface TasksResponse {
-  data: Task[] | Record<string, Task[]>;
-  count: number;
-}
-
-// Type for task response (single task)
-export interface TaskResponse {
-  data: Task;
-}
+import {
+  Project,
+  ProjectCreateInput,
+  ProjectDetailResponse,
+  ProjectUpdateInput,
+  TeamMember,
+  TeamMemberCreateInput,
+  TeamMemberUpdateInput,
+  Milestone,
+  MilestoneCreateInput,
+  MilestoneUpdateInput,
+  Task,
+  TaskCreateInput,
+  TaskUpdateInput,
+  TasksResponse,
+  TaskResponse,
+  TaskReorderInput,
+  PaginatedResponse,
+} from "@/lib/types";
 
 export const projectsApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -150,7 +75,7 @@ export const projectsApi = api.injectEndpoints({
       keepUnusedDataFor: 60,
     }),
 
-    getProjectById: build.query<Project, string>({
+    getProjectById: build.query<ProjectDetailResponse, string>({
       query: (id) => `/projects/${id}`,
       providesTags: (_, __, id) => [{ type: "Projects", id }],
     }),
@@ -169,7 +94,7 @@ export const projectsApi = api.injectEndpoints({
           : [{ type: "Projects", id: "LIST" }],
     }),
 
-    addProject: build.mutation<Project, Partial<Project>>({
+    addProject: build.mutation<Project, ProjectCreateInput>({
       query: (body) => ({
         url: "/projects",
         method: "POST",
@@ -184,7 +109,7 @@ export const projectsApi = api.injectEndpoints({
           id: tempId,
           startDate: newProject.startDate,
           targetEndDate: newProject.targetEndDate,
-          actualEndDate: newProject.actualEndDate,
+          budget: newProject.budget || "0", // Ensure budget is handled as string
           createdAt: new Date().toJSON(),
           updatedAt: new Date().toJSON(),
         } as unknown as Project;
@@ -246,72 +171,77 @@ export const projectsApi = api.injectEndpoints({
       },
     }),
 
-    updateProject: build.mutation<Project, Partial<Project> & { id: string }>({
-      query: ({ id, ...body }) => ({
-        url: `/projects/${id}`,
-        method: "PATCH",
-        body,
-      }),
-      invalidatesTags: (_, __, arg) => [
-        { type: "Projects", id: arg.id },
-        { type: "Projects", id: "LIST" },
-      ],
-      onQueryStarted: async (updatedProject, { dispatch, queryFulfilled }) => {
-        // Update projects list
-        const listPatch = dispatch(
-          projectsApi.util.updateQueryData("getProjects", {}, (draft) => {
-            const index = draft.data.findIndex(
-              (project) => project.id === updatedProject.id
-            );
-            if (index !== -1)
-              draft.data[index] = {
-                ...draft.data[index],
-                ...updatedProject,
-              };
-          })
-        );
+    updateProject: build.mutation<Project, ProjectUpdateInput & { id: string }>(
+      {
+        query: ({ id, ...body }) => ({
+          url: `/projects/${id}`,
+          method: "PATCH",
+          body,
+        }),
+        invalidatesTags: (_, __, arg) => [
+          { type: "Projects", id: arg.id },
+          { type: "Projects", id: "LIST" },
+        ],
+        onQueryStarted: async (
+          updatedProject,
+          { dispatch, queryFulfilled }
+        ) => {
+          // Update projects list
+          const listPatch = dispatch(
+            projectsApi.util.updateQueryData("getProjects", {}, (draft) => {
+              const index = draft.data.findIndex(
+                (project) => project.id === updatedProject.id
+              );
+              if (index !== -1)
+                draft.data[index] = {
+                  ...draft.data[index],
+                  ...updatedProject,
+                };
+            })
+          );
 
-        // Update project details
-        const detailPatch = dispatch(
-          projectsApi.util.updateQueryData(
-            "getProjectById",
-            updatedProject.id,
-            (draft) => {
-              Object.assign(draft, { ...draft, ...updatedProject });
-            }
-          )
-        );
-
-        // Update client's projects list
-        let clientPatch;
-        if (updatedProject.clientId) {
-          clientPatch = dispatch(
+          // Update project details
+          const detailPatch = dispatch(
             projectsApi.util.updateQueryData(
-              "getProjectsByClient",
-              updatedProject.clientId,
+              "getProjectById",
+              updatedProject.id,
               (draft) => {
-                const index = draft.data.findIndex(
-                  (project) => project.id === updatedProject.id
-                );
-                if (index !== -1)
-                  draft.data[index] = {
-                    ...draft.data[index],
-                    ...updatedProject,
-                  };
+                Object.assign(draft, { ...draft, ...updatedProject });
               }
             )
           );
-        }
 
-        try {
-          await queryFulfilled;
-        } catch {
-          listPatch.undo();
-          detailPatch.undo();
-          if (clientPatch) clientPatch.undo();
-        }
-      },
-    }),
+          // Update client's projects list
+          let clientPatch;
+          if (updatedProject.clientId) {
+            clientPatch = dispatch(
+              projectsApi.util.updateQueryData(
+                "getProjectsByClient",
+                updatedProject.clientId,
+                (draft) => {
+                  const index = draft.data.findIndex(
+                    (project) => project.id === updatedProject.id
+                  );
+                  if (index !== -1)
+                    draft.data[index] = {
+                      ...draft.data[index],
+                      ...updatedProject,
+                    };
+                }
+              )
+            );
+          }
+
+          try {
+            await queryFulfilled;
+          } catch {
+            listPatch.undo();
+            detailPatch.undo();
+            if (clientPatch) clientPatch.undo();
+          }
+        },
+      }
+    ),
 
     deleteProject: build.mutation<void, string>({
       query: (id) => ({
@@ -412,7 +342,7 @@ export const projectsApi = api.injectEndpoints({
 
     addTeamMember: build.mutation<
       TeamMember,
-      { projectId: string; teamMember: Omit<TeamMember, "id" | "name"> }
+      { projectId: string; teamMember: TeamMemberCreateInput }
     >({
       query: ({ projectId, teamMember }) => ({
         url: `/projects/${projectId}/team-members`,
@@ -451,11 +381,10 @@ export const projectsApi = api.injectEndpoints({
             "getProjectById",
             projectId,
             (draft) => {
-              if (draft.teamMembers) {
-                draft.teamMembers.push(newTeamMember);
-              } else {
-                draft.teamMembers = [newTeamMember];
+              if (!draft.teamMembers) {
+                draft.teamMembers = [];
               }
+              draft.teamMembers.push(newTeamMember);
             }
           )
         );
@@ -481,7 +410,7 @@ export const projectsApi = api.injectEndpoints({
               (draft) => {
                 if (draft.teamMembers) {
                   const index = draft.teamMembers.findIndex(
-                    (member) => member.id === tempId
+                    (member: TeamMember) => member.id === tempId
                   );
                   if (index !== -1)
                     draft.teamMembers[index] = createdTeamMember;
@@ -501,7 +430,7 @@ export const projectsApi = api.injectEndpoints({
       {
         projectId: string;
         teamMemberId: string;
-        teamMember: Partial<Omit<TeamMember, "id" | "name">>;
+        teamMember: TeamMemberUpdateInput;
       }
     >({
       query: ({ projectId, teamMemberId, teamMember }) => ({
@@ -683,7 +612,7 @@ export const projectsApi = api.injectEndpoints({
 
     addMilestone: build.mutation<
       Milestone,
-      { projectId: string; milestone: Omit<Milestone, "id"> }
+      { projectId: string; milestone: MilestoneCreateInput }
     >({
       query: ({ projectId, milestone }) => ({
         url: `/projects/${projectId}/milestones`,
@@ -723,11 +652,10 @@ export const projectsApi = api.injectEndpoints({
             "getProjectById",
             projectId,
             (draft) => {
-              if (draft.milestones) {
-                draft.milestones.push(optimisticMilestone);
-              } else {
-                draft.milestones = [optimisticMilestone];
+              if (!draft.milestonesData) {
+                draft.milestonesData = [];
               }
+              draft.milestonesData.push(optimisticMilestone);
             }
           )
         );
@@ -751,11 +679,12 @@ export const projectsApi = api.injectEndpoints({
               "getProjectById",
               projectId,
               (draft) => {
-                if (draft.milestones) {
-                  const index = draft.milestones.findIndex(
-                    (item) => item.id === tempId
+                if (draft.milestonesData) {
+                  const index = draft.milestonesData.findIndex(
+                    (item: Milestone) => item.id === tempId
                   );
-                  if (index !== -1) draft.milestones[index] = createdMilestone;
+                  if (index !== -1)
+                    draft.milestonesData[index] = createdMilestone;
                 }
               }
             )
@@ -772,7 +701,7 @@ export const projectsApi = api.injectEndpoints({
       {
         projectId: string;
         milestoneId: string;
-        milestone: Partial<Omit<Milestone, "id">>;
+        milestone: MilestoneUpdateInput;
       }
     >({
       query: ({ projectId, milestoneId, milestone }) => ({
@@ -826,13 +755,13 @@ export const projectsApi = api.injectEndpoints({
             "getProjectById",
             projectId,
             (draft) => {
-              if (draft.milestones) {
-                const index = draft.milestones.findIndex(
-                  (item) => item.id === milestoneId
+              if (draft.milestonesData) {
+                const index = draft.milestonesData.findIndex(
+                  (item: Milestone) => item.id === milestoneId
                 );
                 if (index !== -1) {
-                  draft.milestones[index] = {
-                    ...draft.milestones[index],
+                  draft.milestonesData[index] = {
+                    ...draft.milestonesData[index],
                     ...milestone,
                   };
                 }
@@ -886,11 +815,11 @@ export const projectsApi = api.injectEndpoints({
             "getProjectById",
             projectId,
             (draft) => {
-              if (draft.milestones) {
-                const index = draft.milestones.findIndex(
-                  (item) => item.id === milestoneId
+              if (draft.milestonesData) {
+                const index = draft.milestonesData.findIndex(
+                  (item: Milestone) => item.id === milestoneId
                 );
-                if (index !== -1) draft.milestones.splice(index, 1);
+                if (index !== -1) draft.milestonesData.splice(index, 1);
               }
             }
           )
@@ -976,7 +905,7 @@ export const projectsApi = api.injectEndpoints({
       Task,
       {
         projectId: string;
-        task: Omit<Task, "id" | "projectId" | "createdAt" | "updatedAt">;
+        task: TaskCreateInput;
       }
     >({
       query: ({ projectId, task }) => ({
@@ -1003,9 +932,9 @@ export const projectsApi = api.injectEndpoints({
           priority: task.priority || 2,
           dueDate: task.dueDate || null,
           startDate: task.startDate || null,
-          estimatedHours: task.estimatedHours || null,
-          actualHours: task.actualHours || null,
-          completedDate: task.completedDate || null,
+          estimatedHours: task.estimatedHours || null, // This is now a string
+          actualHours: null,
+          completedDate: null,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           projectId,
@@ -1072,9 +1001,7 @@ export const projectsApi = api.injectEndpoints({
       {
         projectId: string;
         taskId: string;
-        task: Partial<
-          Omit<Task, "id" | "projectId" | "createdAt" | "updatedAt">
-        >;
+        task: TaskUpdateInput;
       }
     >({
       query: ({ projectId, taskId, task }) => ({
@@ -1131,10 +1058,9 @@ export const projectsApi = api.injectEndpoints({
                               (t: Task) => t.id === taskId
                             );
                             if (taskIndex !== -1) {
-                              currentTask = { ...tasks[taskIndex] };
-                              originalStatus = status;
-                              // Remove from original status column
-                              draft.data[status].splice(taskIndex, 1);
+                              const typedStatus =
+                                status as keyof typeof draft.data;
+                              draft.data[typedStatus].splice(taskIndex, 1);
                               break;
                             }
                           }
@@ -1248,12 +1174,12 @@ export const projectsApi = api.injectEndpoints({
               }
             } else {
               // Handle grouped data structure
-              for (const status in draft.data) {
-                const index = draft.data[status].findIndex(
-                  (t: Task) => t.id === taskId
-                );
+              for (const status of Object.keys(draft.data)) {
+                const typedStatus = status as keyof typeof draft.data;
+                const tasks = draft.data[typedStatus];
+                const index = tasks.findIndex((t: Task) => t.id === taskId);
                 if (index !== -1) {
-                  draft.data[status].splice(index, 1);
+                  draft.data[typedStatus].splice(index, 1);
                   draft.count = Math.max(0, (draft.count || 0) - 1);
                   break;
                 }
@@ -1283,22 +1209,23 @@ export const projectsApi = api.injectEndpoints({
       { success: boolean },
       {
         projectId: string;
-        status: "todo" | "in_progress" | "review" | "done";
-        taskIds: string[];
+        reorderInput: TaskReorderInput;
       }
     >({
-      query: ({ projectId, status, taskIds }) => ({
+      query: ({ projectId, reorderInput }) => ({
         url: `/projects/${projectId}/tasks/reorder`,
         method: "POST",
-        body: { status, taskIds },
+        body: reorderInput,
       }),
       invalidatesTags: (result, error, { projectId }) => [
         { type: "Projects", id: `tasks-${projectId}` },
       ],
       onQueryStarted: async (
-        { projectId, status, taskIds },
+        { projectId, reorderInput },
         { dispatch, queryFulfilled, getState }
       ) => {
+        const { status, taskIds } = reorderInput;
+
         const state = getState() as any;
         const tasksQueries = Object.values(state.api.queries).filter(
           (query: any) =>

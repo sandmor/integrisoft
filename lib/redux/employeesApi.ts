@@ -1,27 +1,10 @@
 import { api } from "@/lib/redux/api";
-
-// Updated to simplify types since all fields use the same types now
-type TypeSafeUpdate<T> = Partial<T>;
-
-export interface Employee {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  position: string;
-  department: string;
-  status: "active" | "inactive" | "on-leave";
-  hireDate: string;
-  userId?: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface PaginatedResponse<T> {
-  data: T[];
-  count: number;
-  pageCount: number;
-}
+import {
+  Employee,
+  CreateEmployeeRequest,
+  UpdateEmployeeRequest,
+} from "@/lib/types/employees";
+import { PaginatedResponse } from "../types";
 
 export const employeesApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -84,10 +67,7 @@ export const employeesApi = api.injectEndpoints({
       providesTags: (_, __, id) => [{ type: "Employees", id }],
     }),
 
-    addEmployee: build.mutation<
-      Employee,
-      TypeSafeUpdate<Omit<Employee, "id" | "createdAt" | "updatedAt">>
-    >({
+    addEmployee: build.mutation<Employee, Partial<CreateEmployeeRequest>>({
       query: (body) => ({
         url: "/employees",
         method: "POST",
@@ -107,7 +87,7 @@ export const employeesApi = api.injectEndpoints({
         const patchResult = dispatch(
           employeesApi.util.updateQueryData("getEmployees", {}, (draft) => {
             draft.data.unshift(optimisticEmployee);
-            draft.count = (draft.count || 0) + 1;
+            draft.totalCount = (draft.totalCount || 0) + 1;
           })
         );
 
@@ -132,9 +112,7 @@ export const employeesApi = api.injectEndpoints({
       Employee,
       {
         id: string;
-        employee: TypeSafeUpdate<
-          Omit<Employee, "id" | "createdAt" | "updatedAt">
-        >;
+        employee: Partial<UpdateEmployeeRequest>;
       }
     >({
       query: ({ id, employee }) => ({
@@ -198,7 +176,7 @@ export const employeesApi = api.injectEndpoints({
             );
             if (index !== -1) {
               draft.data.splice(index, 1);
-              draft.count = (draft.count || 0) - 1;
+              draft.totalCount = (draft.totalCount || 0) - 1;
             }
           })
         );

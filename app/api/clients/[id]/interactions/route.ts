@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { addClientInteraction, getClientById } from "@/lib/actions/clients";
 import { tryCatch } from "@/lib/error-handler";
 import { auth } from "@/lib/auth";
+import {
+  ClientInteraction,
+  AddClientInteractionRequest,
+} from "@/lib/types/clients";
 
 // GET /api/clients/[id]/interactions - Get interactions for a specific client
 export async function GET(
@@ -19,7 +23,9 @@ export async function GET(
       return NextResponse.json({ error: "Client not found" }, { status: 404 });
     }
 
-    return NextResponse.json(client.interactions || []);
+    return NextResponse.json(
+      client.interactions || ([] as ClientInteraction[])
+    );
   } catch (error) {
     console.error("Error fetching client interactions:", error);
     return NextResponse.json(
@@ -41,7 +47,7 @@ export async function POST(
   const { id } = await params;
 
   try {
-    const data = await req.json();
+    const data = (await req.json()) as AddClientInteractionRequest;
     const interactionId = await tryCatch(
       () =>
         addClientInteraction(id, {
@@ -60,7 +66,7 @@ export async function POST(
     const updatedClient = await getClientById(id);
     const newInteraction = updatedClient?.interactions.find(
       (interaction) => interaction.id === interactionId
-    );
+    ) as ClientInteraction | undefined;
 
     return NextResponse.json(newInteraction);
   } catch (error) {

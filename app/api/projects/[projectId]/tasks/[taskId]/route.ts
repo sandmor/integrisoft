@@ -12,12 +12,18 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { createId } from "@paralleldrive/cuid2";
 import {
-  TaskStatus,
   moveTaskBetweenColumns,
-  moveTaskBetweenColumnsWithPosition,
+  removeTaskFromOrder,
 } from "@/lib/db/kanban-order";
+import {
+  Task,
+  TaskResponse,
+  TaskStatus,
+  TaskPriority,
+  TaskUpdateInput,
+} from "@/lib/types";
 
-// GET /api/projects/[projectId]/tasks/[taskId] - Get a single task
+// GET /api/projects/[projectId]/tasks/[taskId] - Get a single task by ID
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string; taskId: string }> }
@@ -32,8 +38,8 @@ export async function GET(
 
     const { projectId, taskId } = await params;
 
-    // Retrieve task with relationships
-    const taskWithDetails = await db
+    // Get task with related data
+    const [taskWithDetails] = await db
       .select({
         id: tasks.id,
         title: tasks.title,
@@ -48,9 +54,9 @@ export async function GET(
         completedDate: tasks.completedDate,
         createdAt: tasks.createdAt,
         updatedAt: tasks.updatedAt,
-        milestoneId: tasks.milestoneId,
         projectId: tasks.projectId,
-        assigneeName: sql`CASE WHEN ${employees.id} IS NOT NULL THEN concat(${users.name}, ' ', ${users.lastName}) ELSE NULL END`,
+        milestoneId: tasks.milestoneId,
+        assigneeName: sql<string>`CASE WHEN ${employees.id} IS NOT NULL THEN concat(${users.name}, ' ', ${users.lastName}) ELSE NULL END`,
         milestoneName: milestones.name,
       })
       .from(tasks)
@@ -63,20 +69,39 @@ export async function GET(
           eq(tasks.projectId, projectId),
           not(eq(tasks.isDeleted, true))
         )
-      )
-      .then((rows) => rows[0]);
+      );
 
     if (!taskWithDetails) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
     // Format the response
-    const formattedTask = {
-      ...taskWithDetails,
+    const formattedTask: Task = {
+      id: taskWithDetails.id,
+      title: taskWithDetails.title,
+      description: taskWithDetails.description,
+      status: taskWithDetails.status as TaskStatus,
+      priority: taskWithDetails.priority as TaskPriority,
+      assignedToId: taskWithDetails.assignedToId,
+      estimatedHours: taskWithDetails.estimatedHours,
+      actualHours: taskWithDetails.actualHours,
+      projectId: taskWithDetails.projectId,
+      startDate: taskWithDetails.startDate
+        ? taskWithDetails.startDate.toISOString()
+        : null,
+      dueDate: taskWithDetails.dueDate
+        ? taskWithDetails.dueDate.toISOString()
+        : null,
+      completedDate: taskWithDetails.completedDate
+        ? taskWithDetails.completedDate.toISOString()
+        : null,
+      createdAt: taskWithDetails.createdAt.toISOString(),
+      updatedAt: taskWithDetails.updatedAt.toISOString(),
+      milestoneId: taskWithDetails.milestoneId,
       assignee: taskWithDetails.assignedToId
         ? {
             id: taskWithDetails.assignedToId,
-            name: taskWithDetails.assigneeName || `Unknown Employee`,
+            name: taskWithDetails.assigneeName || "Unknown Employee",
           }
         : null,
       milestone: taskWithDetails.milestoneId
@@ -87,12 +112,15 @@ export async function GET(
         : null,
     };
 
-    // Use consistent format with data property
-    return NextResponse.json({ data: formattedTask });
+    const response: TaskResponse = {
+      data: formattedTask,
+    };
+
+    return NextResponse.json(response);
   } catch (error) {
-    console.error("Error retrieving task:", error);
+    console.error("Error fetching task:", error);
     return NextResponse.json(
-      { error: "Failed to retrieve task" },
+      { error: "Failed to fetch task" },
       { status: 500 }
     );
   }
@@ -112,10 +140,12 @@ export async function PATCH(
     }
 
     const { projectId, taskId } = await params;
-    const data = await req.json();
+    const data: TaskUpdateInput = await req.json();
+    const isStatusChange = data.status !== undefined;
+    const wasAssignedTo = data.assignedToId !== undefined;
 
-    // Find the current task data to check for status changes
-    const currentTask = await db
+    // Get current task to compare changes
+    const [existingTask] = await db
       .select()
       .from(tasks)
       .where(
@@ -124,66 +154,82 @@ export async function PATCH(
           eq(tasks.projectId, projectId),
           not(eq(tasks.isDeleted, true))
         )
-      )
-      .then((rows) => rows[0]);
+      );
 
-    if (!currentTask) {
+    if (!existingTask) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
-    // Handle status changes with position index for kanban board
-    if (data.status && data.status !== currentTask.status) {
-      // If position index is provided, insert at specific position
-      if (data.positionIndex !== undefined) {
-        await moveTaskBetweenColumnsWithPosition(
-          projectId,
-          taskId,
-          currentTask.status as TaskStatus,
-          data.status as TaskStatus,
-          data.positionIndex
-        );
-      } else {
-        // Otherwise, just move it to the new column (default behavior)
-        await moveTaskBetweenColumns(
-          projectId,
-          taskId,
-          currentTask.status as TaskStatus,
-          data.status as TaskStatus
-        );
-      }
+    // Prepare updates
+    const updateData: Record<string, any> = {
+      updatedAt: new Date(),
+      ...data,
+    };
+
+    // Handle date fields properly
+    if (data.startDate) {
+      updateData.startDate = new Date(data.startDate);
+    }
+    if (data.dueDate) {
+      updateData.dueDate = new Date(data.dueDate);
+    }
+    if (data.completedDate) {
+      updateData.completedDate = new Date(data.completedDate);
+    } else if (data.status === "done" && !existingTask.completedDate) {
+      // Automatically set completion date when moved to done
+      updateData.completedDate = new Date();
     }
 
-    // If task is completed, set the completedDate
-    if (data.status === "done" && currentTask.status !== "done") {
-      data.completedDate = data.completedDate || new Date();
-    }
-
-    // If task is moved out of done, clear completedDate
-    if (
-      data.status &&
-      data.status !== "done" &&
-      currentTask.status === "done"
-    ) {
-      data.completedDate = null;
-    }
-
-    // Remove the positionIndex from data as it's not a column in the tasks table
-    if ("positionIndex" in data) {
-      delete data.positionIndex;
-    }
-
-    // Update the task
+    // Update task in database
     const [updatedTask] = await db
       .update(tasks)
-      .set({
-        ...data,
-        updatedAt: new Date(),
-      })
-      .where(eq(tasks.id, taskId))
+      .set(updateData)
+      .where(
+        and(
+          eq(tasks.id, taskId),
+          eq(tasks.projectId, projectId),
+          not(eq(tasks.isDeleted, true))
+        )
+      )
       .returning();
 
-    // Get complete task data with assignee and milestone information
-    const taskWithDetails = await db
+    if (!updatedTask) {
+      return NextResponse.json(
+        { error: "Failed to update task" },
+        { status: 500 }
+      );
+    }
+
+    // Handle status change - update kanban order if needed
+    if (isStatusChange && existingTask.status !== data.status) {
+      await moveTaskBetweenColumns(
+        projectId,
+        taskId,
+        existingTask.status as TaskStatus,
+        data.status as TaskStatus
+      );
+    }
+
+    // Create activity entry if the task was assigned
+    if (wasAssignedTo && existingTask.assignedToId !== data.assignedToId) {
+      await db.insert(activitiesFeed).values({
+        id: createId(),
+        userId: session.user.id,
+        action: data.assignedToId ? "assign" : "unassign",
+        module: "tasks",
+        description: data.assignedToId
+          ? `Task "${existingTask.title}" was assigned`
+          : `Task "${existingTask.title}" was unassigned`,
+        projectId: projectId,
+        taskId: taskId,
+        employeeId: data.assignedToId || existingTask.assignedToId,
+        timestamp: new Date(),
+        isSystem: false,
+      });
+    }
+
+    // Get full updated task with related data for response
+    const [taskWithDetails] = await db
       .select({
         id: tasks.id,
         title: tasks.title,
@@ -198,25 +244,50 @@ export async function PATCH(
         completedDate: tasks.completedDate,
         createdAt: tasks.createdAt,
         updatedAt: tasks.updatedAt,
-        milestoneId: tasks.milestoneId,
         projectId: tasks.projectId,
-        assigneeName: sql`CASE WHEN ${employees.id} IS NOT NULL THEN concat(${users.name}, ' ', ${users.lastName}) ELSE NULL END`,
+        milestoneId: tasks.milestoneId,
+        assigneeName: sql<string>`CASE WHEN ${employees.id} IS NOT NULL THEN concat(${users.name}, ' ', ${users.lastName}) ELSE NULL END`,
         milestoneName: milestones.name,
       })
       .from(tasks)
       .leftJoin(employees, eq(tasks.assignedToId, employees.id))
       .leftJoin(users, eq(employees.userId, users.id))
       .leftJoin(milestones, eq(tasks.milestoneId, milestones.id))
-      .where(eq(tasks.id, taskId))
-      .then((rows) => rows[0]);
+      .where(
+        and(
+          eq(tasks.id, taskId),
+          eq(tasks.projectId, projectId),
+          not(eq(tasks.isDeleted, true))
+        )
+      );
 
-    // Format the response data
-    const formattedTask = {
-      ...taskWithDetails,
+    // Format the response
+    const formattedTask: Task = {
+      id: taskWithDetails.id,
+      title: taskWithDetails.title,
+      description: taskWithDetails.description,
+      status: taskWithDetails.status as TaskStatus,
+      priority: taskWithDetails.priority as TaskPriority,
+      assignedToId: taskWithDetails.assignedToId,
+      estimatedHours: taskWithDetails.estimatedHours,
+      actualHours: taskWithDetails.actualHours,
+      projectId: taskWithDetails.projectId,
+      startDate: taskWithDetails.startDate
+        ? taskWithDetails.startDate.toISOString()
+        : null,
+      dueDate: taskWithDetails.dueDate
+        ? taskWithDetails.dueDate.toISOString()
+        : null,
+      completedDate: taskWithDetails.completedDate
+        ? taskWithDetails.completedDate.toISOString()
+        : null,
+      createdAt: taskWithDetails.createdAt.toISOString(),
+      updatedAt: taskWithDetails.updatedAt.toISOString(),
+      milestoneId: taskWithDetails.milestoneId,
       assignee: taskWithDetails.assignedToId
         ? {
             id: taskWithDetails.assignedToId,
-            name: taskWithDetails.assigneeName || `Unknown Employee`,
+            name: taskWithDetails.assigneeName || "Unknown Employee",
           }
         : null,
       milestone: taskWithDetails.milestoneId
@@ -227,22 +298,11 @@ export async function PATCH(
         : null,
     };
 
-    // Record an activity for status change
-    if (data.status && data.status !== currentTask.status) {
-      await db.insert(activitiesFeed).values({
-        id: createId(),
-        userId: session.user.id,
-        action: "update",
-        module: "tasks",
-        description: `Task "${currentTask.title}" status changed from "${currentTask.status}" to "${data.status}"`,
-        projectId: projectId,
-        taskId: taskId,
-        timestamp: new Date(),
-        isSystem: true,
-      });
-    }
+    const response: TaskResponse = {
+      data: formattedTask,
+    };
 
-    return NextResponse.json(formattedTask);
+    return NextResponse.json(response);
   } catch (error) {
     console.error("Error updating task:", error);
     return NextResponse.json(
@@ -267,28 +327,10 @@ export async function DELETE(
 
     const { projectId, taskId } = await params;
 
-    // Get the task before deletion to know its status
-    const taskToDelete = await db.query.tasks.findFirst({
-      where: and(
-        eq(tasks.id, taskId),
-        eq(tasks.projectId, projectId),
-        not(eq(tasks.isDeleted, true))
-      ),
-    });
-
-    if (!taskToDelete) {
-      return NextResponse.json({ error: "Task not found" }, { status: 404 });
-    }
-
-    const status = taskToDelete.status as TaskStatus;
-
-    // Soft delete the task by setting isDeleted to true
-    await db
-      .update(tasks)
-      .set({
-        isDeleted: true,
-        updatedAt: new Date(),
-      })
+    // Check if task exists and get its status
+    const [existingTask] = await db
+      .select({ status: tasks.status })
+      .from(tasks)
       .where(
         and(
           eq(tasks.id, taskId),
@@ -297,20 +339,30 @@ export async function DELETE(
         )
       );
 
-    // Remove the task ID from the kanban board order arrays
-    await moveTaskBetweenColumns(projectId, taskId, status, status);
+    if (!existingTask) {
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    }
 
-    // Log deletion activity
-    await db.insert(activitiesFeed).values({
-      id: createId(),
-      userId: session.user.id,
-      action: "delete",
-      module: "tasks",
-      description: `Task "${taskToDelete.title}" was deleted`,
-      projectId,
-      timestamp: new Date(),
-      isSystem: false,
-    });
+    // Soft delete task
+    await db
+      .update(tasks)
+      .set({
+        isDeleted: true,
+        updatedAt: new Date(),
+      })
+      .where(eq(tasks.id, taskId));
+
+    // Remove task from kanban order
+    try {
+      await removeTaskFromOrder(
+        projectId,
+        existingTask.status as TaskStatus,
+        taskId
+      );
+    } catch (error) {
+      console.error("Error removing task from order:", error);
+      // Continue with the response as we only log the error but don't fail the request
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {

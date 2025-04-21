@@ -1,23 +1,10 @@
+import { PaginatedResponse } from "../types";
 import { api } from "./api";
-
-// Updated to simplify types since all fields use the same types now
-type TypeSafeUpdate<T> = Partial<T>;
-
-export interface Client {
-  id: string;
-  name: string;
-  email?: string;
-  phone?: string;
-  status: "active" | "inactive";
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-export interface PaginatedResponse<T> {
-  data: T[];
-  count: number;
-  pageCount: number;
-}
+import {
+  Client,
+  CreateClientRequest,
+  UpdateClientRequest,
+} from "@/lib/types/clients";
 
 export const clientsApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -76,10 +63,7 @@ export const clientsApi = api.injectEndpoints({
       providesTags: (_, __, id) => [{ type: "Clients", id }],
     }),
 
-    addClient: build.mutation<
-      Client,
-      TypeSafeUpdate<Omit<Client, "id" | "createdAt" | "updatedAt">>
-    >({
+    addClient: build.mutation<Client, Partial<CreateClientRequest>>({
       query: (body) => ({
         url: "/clients",
         method: "POST",
@@ -99,7 +83,7 @@ export const clientsApi = api.injectEndpoints({
         const patchResult = dispatch(
           clientsApi.util.updateQueryData("getClients", {}, (draft) => {
             draft.data.unshift(optimisticClient);
-            draft.count = (draft.count || 0) + 1;
+            draft.totalCount = (draft.totalCount || 0) + 1;
           })
         );
 
@@ -124,7 +108,7 @@ export const clientsApi = api.injectEndpoints({
       Client,
       {
         id: string;
-        client: TypeSafeUpdate<Omit<Client, "id" | "createdAt" | "updatedAt">>;
+        client: Partial<UpdateClientRequest>;
       }
     >({
       query: ({ id, client }) => ({
@@ -176,7 +160,7 @@ export const clientsApi = api.injectEndpoints({
             const index = draft.data.findIndex((client) => client.id === id);
             if (index !== -1) {
               draft.data.splice(index, 1);
-              draft.count = (draft.count || 0) - 1;
+              draft.totalCount = (draft.totalCount || 0) - 1;
             }
           })
         );

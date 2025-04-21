@@ -13,13 +13,16 @@ import {
 } from "../db/schema";
 import { eq, and, desc, count, inArray, ilike, asc } from "drizzle-orm";
 import { headers } from "next/headers";
+import {
+  Client,
+  GetClientsParams,
+  CreateClientRequest,
+  UpdateClientRequest,
+  AddClientContactRequest,
+  AddClientInteractionRequest,
+} from "../types/clients";
 
-export async function getClients(options?: {
-  page?: number;
-  pageSize?: number;
-  sorts?: Array<{ field: string; direction: "asc" | "desc" }>;
-  filters?: Array<{ field: string; value: string }>;
-}) {
+export async function getClients(options?: GetClientsParams) {
   const { page = 0, pageSize = 10, sorts = [], filters = [] } = options || {};
 
   // Build the base query
@@ -153,7 +156,8 @@ export async function getClients(options?: {
   const data = results.map((client) => ({
     ...client,
     projectCount: projectCountMap.get(client.id) || 0,
-  }));
+    status: "active" as const, // Adding required status field
+  })) as Client[];
 
   return {
     data,
@@ -304,13 +308,7 @@ export async function getAccountManagers() {
   return managers;
 }
 
-export async function createClient(data: {
-  name: string;
-  industry?: string;
-  website?: string;
-  address?: string;
-  accountManagerId?: string;
-}) {
+export async function createClient(data: CreateClientRequest): Promise<string> {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -340,16 +338,7 @@ export async function createClient(data: {
   return id;
 }
 
-export async function updateClient(
-  id: string,
-  data: {
-    name: string;
-    industry?: string;
-    website?: string;
-    address?: string;
-    accountManagerId?: string;
-  }
-) {
+export async function updateClient(id: string, data: UpdateClientRequest) {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -399,14 +388,7 @@ export async function deleteClient(id: string) {
 
 export async function addClientContact(
   clientId: string,
-  data: {
-    firstName: string;
-    lastName: string;
-    position?: string;
-    email?: string;
-    phone?: string;
-    isPrimary?: boolean;
-  }
+  data: AddClientContactRequest
 ) {
   const session = await auth.api.getSession({
     headers: await headers(),
@@ -475,14 +457,7 @@ export async function deleteClientContact(id: string) {
 
 export async function addClientInteraction(
   clientId: string,
-  data: {
-    contactId?: string;
-    type: string;
-    summary: string;
-    details?: string;
-    followUpDate?: string;
-    followUpNotes?: string;
-  }
+  data: AddClientInteractionRequest
 ) {
   const session = await auth.api.getSession({
     headers: await headers(),

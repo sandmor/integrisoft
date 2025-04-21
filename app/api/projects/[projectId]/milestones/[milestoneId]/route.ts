@@ -4,6 +4,7 @@ import { milestones } from "@/lib/db/schema";
 import { eq, and, not } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { Milestone, MilestoneUpdateInput } from "@/lib/types";
 
 // GET /api/projects/[projectId]/milestones/[milestoneId] - Get a single milestone by ID
 export async function GET(
@@ -36,7 +37,18 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(milestone);
+    const formattedMilestone: Milestone = {
+      id: milestone.id,
+      name: milestone.name,
+      description: milestone.description,
+      dueDate: milestone.dueDate ? milestone.dueDate.toISOString() : null,
+      completedDate: milestone.completedDate
+        ? milestone.completedDate.toISOString()
+        : null,
+      isCompleted: milestone.isCompleted,
+    };
+
+    return NextResponse.json(formattedMilestone);
   } catch (error) {
     console.error("Error fetching milestone:", error);
     return NextResponse.json(
@@ -60,7 +72,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const data = await req.json();
+    const data: MilestoneUpdateInput = await req.json();
 
     // Check if milestone exists
     const [existingMilestone] = await db
@@ -99,7 +111,20 @@ export async function PATCH(
       .where(eq(milestones.id, milestoneId))
       .returning();
 
-    return NextResponse.json(updatedMilestone);
+    const formattedMilestone: Milestone = {
+      id: updatedMilestone.id,
+      name: updatedMilestone.name,
+      description: updatedMilestone.description,
+      dueDate: updatedMilestone.dueDate
+        ? updatedMilestone.dueDate.toISOString()
+        : null,
+      completedDate: updatedMilestone.completedDate
+        ? updatedMilestone.completedDate.toISOString()
+        : null,
+      isCompleted: updatedMilestone.isCompleted,
+    };
+
+    return NextResponse.json(formattedMilestone);
   } catch (error) {
     console.error("Error updating milestone:", error);
     return NextResponse.json(

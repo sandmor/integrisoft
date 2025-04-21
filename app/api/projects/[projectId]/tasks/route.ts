@@ -15,7 +15,14 @@ import {
   TaskStatus,
   addTaskToOrder,
   getOrderedTasksForColumn,
+  moveTaskBetweenColumnsWithPosition,
 } from "@/lib/db/kanban-order";
+import {
+  Task,
+  TaskCreateInput,
+  TaskPriority,
+  TasksResponse,
+} from "@/lib/types";
 
 // GET /api/projects/[projectId]/tasks - Get all tasks for a project
 export async function GET(
@@ -44,7 +51,12 @@ export async function GET(
       ];
 
       // Create a result object to hold tasks for each status
-      const tasksResult: Record<string, any[]> = {};
+      const tasksResult: Record<TaskStatus, Task[]> = {
+        todo: [],
+        in_progress: [],
+        review: [],
+        done: [],
+      };
       let totalCount = 0;
 
       // Get tasks for each status column with proper ordering
@@ -61,7 +73,7 @@ export async function GET(
               const assigneeData = await db
                 .select({
                   id: employees.id,
-                  name: sql`concat(${users.name}, ' ', ${users.lastName})`,
+                  name: sql<string>`concat(${users.name}, ' ', ${users.lastName})`,
                 })
                 .from(employees)
                 .leftJoin(users, eq(employees.userId, users.id))
@@ -71,7 +83,10 @@ export async function GET(
               if (assigneeData) {
                 assignee = {
                   id: assigneeData.id,
-                  name: assigneeData.name || "Unknown Employee",
+                  name:
+                    typeof assigneeData.name === "string"
+                      ? assigneeData.name
+                      : "Unknown Employee",
                 };
               }
             }
@@ -94,18 +109,29 @@ export async function GET(
               }
             }
 
-            return {
-              ...task,
-              createdAt: task.createdAt.toISOString(),
-              updatedAt: task.updatedAt.toISOString(),
+            const formattedTask: Task = {
+              id: task.id,
+              title: task.title,
+              description: task.description,
+              status: task.status as TaskStatus,
+              priority: task.priority as TaskPriority,
+              assignedToId: task.assignedToId,
+              estimatedHours: task.estimatedHours,
+              actualHours: task.actualHours,
               startDate: task.startDate ? task.startDate.toISOString() : null,
               dueDate: task.dueDate ? task.dueDate.toISOString() : null,
               completedDate: task.completedDate
                 ? task.completedDate.toISOString()
                 : null,
+              createdAt: task.createdAt.toISOString(),
+              updatedAt: task.updatedAt.toISOString(),
+              milestoneId: task.milestoneId,
+              projectId: task.projectId,
               assignee,
               milestone,
             };
+
+            return formattedTask;
           })
         );
 
@@ -113,10 +139,12 @@ export async function GET(
         totalCount += tasksWithDetails.length;
       }
 
-      return NextResponse.json({
+      const response: TasksResponse = {
         data: tasksResult,
         count: totalCount,
-      });
+      };
+
+      return NextResponse.json(response);
     } else {
       // Get tasks for standard list/calendar views
       const tasksWithAssignees = await db
@@ -135,7 +163,8 @@ export async function GET(
           createdAt: tasks.createdAt,
           updatedAt: tasks.updatedAt,
           milestoneId: tasks.milestoneId,
-          assigneeName: sql`CASE WHEN ${employees.id} IS NOT NULL THEN concat(${users.name}, ' ', ${users.lastName}) ELSE NULL END`,
+          projectId: tasks.projectId,
+          assigneeName: sql<string>`CASE WHEN ${employees.id} IS NOT NULL THEN concat(${users.name}, ' ', ${users.lastName}) ELSE NULL END`,
           milestoneName: milestones.name,
         })
         .from(tasks)
@@ -148,20 +177,29 @@ export async function GET(
         .orderBy(desc(tasks.updatedAt));
 
       // Format the response data
-      const formattedTasks = tasksWithAssignees.map((task) => {
+      const formattedTasks: Task[] = tasksWithAssignees.map((task) => {
         return {
-          ...task,
-          createdAt: task.createdAt.toISOString(),
-          updatedAt: task.updatedAt.toISOString(),
+          id: task.id,
+          title: task.title,
+          description: task.description,
+          status: task.status as TaskStatus,
+          priority: task.priority as TaskPriority,
+          assignedToId: task.assignedToId,
+          estimatedHours: task.estimatedHours,
+          actualHours: task.actualHours,
+          projectId: task.projectId,
           startDate: task.startDate ? task.startDate.toISOString() : null,
           dueDate: task.dueDate ? task.dueDate.toISOString() : null,
           completedDate: task.completedDate
             ? task.completedDate.toISOString()
             : null,
+          createdAt: task.createdAt.toISOString(),
+          updatedAt: task.updatedAt.toISOString(),
+          milestoneId: task.milestoneId,
           assignee: task.assignedToId
             ? {
                 id: task.assignedToId,
-                name: task.assigneeName || `Unknown Employee`,
+                name: task.assigneeName || "Unknown Employee",
               }
             : null,
           milestone: task.milestoneId
@@ -173,10 +211,12 @@ export async function GET(
         };
       });
 
-      return NextResponse.json({
+      const response: TasksResponse = {
         data: formattedTasks,
         count: formattedTasks.length,
-      });
+      };
+
+      return NextResponse.json(response);
     }
   } catch (error) {
     console.error("Error fetching project tasks:", error);
@@ -201,7 +241,7 @@ export async function POST(
     }
 
     const { projectId } = await params;
-    const data = await req.json();
+    const data: TaskCreateInput = await req.json();
 
     // Validate required fields
     if (!data.title) {
@@ -213,6 +253,7 @@ export async function POST(
 
     const taskId = createId();
     const taskStatus = data.status || ("todo" as TaskStatus);
+    const taskPriority = data.priority || (2 as TaskPriority); // Default to medium priority
 
     // Insert task
     const [newTask] = await db
@@ -223,12 +264,12 @@ export async function POST(
         title: data.title,
         description: data.description,
         status: taskStatus,
-        priority: data.priority || 2, // Default to medium priority
+        priority: taskPriority,
         assignedToId: data.assignedToId,
         milestoneId: data.milestoneId,
         estimatedHours: data.estimatedHours,
-        dueDate: data.dueDate,
-        startDate: data.startDate,
+        dueDate: data.dueDate ? new Date(data.dueDate) : null,
+        startDate: data.startDate ? new Date(data.startDate) : null,
         createdById: session.user.id,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -271,8 +312,9 @@ export async function POST(
         completedDate: tasks.completedDate,
         createdAt: tasks.createdAt,
         updatedAt: tasks.updatedAt,
+        projectId: tasks.projectId,
         milestoneId: tasks.milestoneId,
-        assigneeName: sql`CASE WHEN ${employees.id} IS NOT NULL THEN concat(${users.name}, ' ', ${users.lastName}) ELSE NULL END`,
+        assigneeName: sql<string>`CASE WHEN ${employees.id} IS NOT NULL THEN concat(${users.name}, ' ', ${users.lastName}) ELSE NULL END`,
         milestoneName: milestones.name,
       })
       .from(tasks)
@@ -283,12 +325,32 @@ export async function POST(
       .then((rows) => rows[0]);
 
     // Format the response
-    const formattedTask = {
-      ...taskWithAssignee,
+    const formattedTask: Task = {
+      id: taskWithAssignee.id,
+      title: taskWithAssignee.title,
+      description: taskWithAssignee.description,
+      status: taskWithAssignee.status as TaskStatus,
+      priority: taskWithAssignee.priority as TaskPriority,
+      assignedToId: taskWithAssignee.assignedToId,
+      estimatedHours: taskWithAssignee.estimatedHours,
+      actualHours: taskWithAssignee.actualHours,
+      projectId: taskWithAssignee.projectId,
+      dueDate: taskWithAssignee.dueDate
+        ? taskWithAssignee.dueDate.toISOString()
+        : null,
+      startDate: taskWithAssignee.startDate
+        ? taskWithAssignee.startDate.toISOString()
+        : null,
+      completedDate: taskWithAssignee.completedDate
+        ? taskWithAssignee.completedDate.toISOString()
+        : null,
+      createdAt: taskWithAssignee.createdAt.toISOString(),
+      updatedAt: taskWithAssignee.updatedAt.toISOString(),
+      milestoneId: taskWithAssignee.milestoneId,
       assignee: taskWithAssignee.assignedToId
         ? {
             id: taskWithAssignee.assignedToId,
-            name: taskWithAssignee.assigneeName || `Unknown Employee`,
+            name: taskWithAssignee.assigneeName || "Unknown Employee",
           }
         : null,
       milestone: taskWithAssignee.milestoneId

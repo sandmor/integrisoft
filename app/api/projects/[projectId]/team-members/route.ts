@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { createId } from "@paralleldrive/cuid2";
 import { revalidatePath } from "next/cache";
+import { TeamMember, TeamMemberCreateInput } from "@/lib/types";
 
 // GET /api/projects/[projectId]/team-members - Get all team members for a project
 export async function GET(
@@ -44,17 +45,17 @@ export async function GET(
       .leftJoin(users, eq(employees.userId, users.id))
       .orderBy(users.name);
 
-    return NextResponse.json(
-      teamMembers.map((member) => ({
-        id: member.id,
-        employeeId: member.employeeId,
-        name: `${member.employeeName} ${member.employeeLastName}`,
-        role: member.role,
-        allocationPercentage: member.allocationPercentage,
-        startDate: member.startDate,
-        endDate: member.endDate,
-      }))
-    );
+    const formattedTeamMembers: TeamMember[] = teamMembers.map((member) => ({
+      id: member.id,
+      employeeId: member.employeeId,
+      name: `${member.employeeName} ${member.employeeLastName}`,
+      role: member.role,
+      allocationPercentage: member.allocationPercentage,
+      startDate: member.startDate ? member.startDate.toISOString() : null,
+      endDate: member.endDate ? member.endDate.toISOString() : null,
+    }));
+
+    return NextResponse.json(formattedTeamMembers);
   } catch (error) {
     console.error("Error fetching team members:", error);
     return NextResponse.json(
@@ -78,8 +79,9 @@ export async function POST(
     }
 
     const { projectId } = await params;
+    const teamMemberInput: TeamMemberCreateInput = await req.json();
     const { employeeId, role, allocationPercentage, startDate, endDate } =
-      await req.json();
+      teamMemberInput;
 
     if (!employeeId || !role || !allocationPercentage || !startDate) {
       return NextResponse.json(
@@ -143,7 +145,7 @@ export async function POST(
       .leftJoin(employees, eq(projectTeamMembers.employeeId, employees.id))
       .leftJoin(users, eq(employees.userId, users.id));
 
-    return NextResponse.json({
+    const teamMember: TeamMember = {
       id: newMember.id,
       employeeId: newMember.employeeId,
       name: `${newMember.employeeName} ${newMember.employeeLastName}`,
@@ -151,7 +153,9 @@ export async function POST(
       allocationPercentage: newMember.allocationPercentage,
       startDate: newMember.startDate ? newMember.startDate.toISOString() : null,
       endDate: newMember.endDate ? newMember.endDate.toISOString() : null,
-    });
+    };
+
+    return NextResponse.json(teamMember);
   } catch (error) {
     console.error("Error adding team member:", error);
     return NextResponse.json(

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { addClientContact, getClientById } from "@/lib/actions/clients";
 import { tryCatch } from "@/lib/error-handler";
 import { auth } from "@/lib/auth";
+import { ClientContact, AddClientContactRequest } from "@/lib/types/clients";
 
 // GET /api/clients/[id]/contacts - Get contacts for a specific client
 export async function GET(
@@ -23,7 +24,7 @@ export async function GET(
       return NextResponse.json({ error: "Client not found" }, { status: 404 });
     }
 
-    return NextResponse.json(client.contacts || []);
+    return NextResponse.json(client.contacts || ([] as ClientContact[]));
   } catch (error) {
     console.error("Error fetching client contacts:", error);
     return NextResponse.json(
@@ -44,7 +45,7 @@ export async function POST(
   }
   const { id } = await params;
   try {
-    const data = await req.json();
+    const data = (await req.json()) as AddClientContactRequest;
     const contactId = await tryCatch(
       () =>
         addClientContact(id, {
@@ -63,7 +64,7 @@ export async function POST(
     const updatedClient = await getClientById(id);
     const newContact = updatedClient?.contacts.find(
       (contact) => contact.id === contactId
-    );
+    ) as ClientContact | undefined;
 
     return NextResponse.json(newContact);
   } catch (error) {

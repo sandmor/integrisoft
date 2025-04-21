@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { milestones } from "@/lib/db/schema";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { Milestone, MilestoneCreateInput } from "@/lib/types";
 
 // GET /api/projects/[projectId]/milestones - Get all milestones for a project
 export async function GET(
@@ -33,7 +34,21 @@ export async function GET(
       orderBy: (milestone, { asc }) => [asc(milestone.dueDate)],
     });
 
-    return NextResponse.json(projectMilestones);
+    // Format the response
+    const formattedMilestones: Milestone[] = projectMilestones.map(
+      (milestone) => ({
+        id: milestone.id,
+        name: milestone.name,
+        description: milestone.description,
+        dueDate: milestone.dueDate ? milestone.dueDate.toISOString() : null,
+        completedDate: milestone.completedDate
+          ? milestone.completedDate.toISOString()
+          : null,
+        isCompleted: milestone.isCompleted,
+      })
+    );
+
+    return NextResponse.json(formattedMilestones);
   } catch (error) {
     console.error("Error fetching milestones:", error);
     return NextResponse.json(
@@ -57,7 +72,7 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const data = await req.json();
+    const data: MilestoneCreateInput = await req.json();
 
     // Check if project exists and user has access
     const project = await db.query.projects.findFirst({
@@ -68,27 +83,39 @@ export async function POST(
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
-    if (!data.dueDate) {
+    if (!data.name || !data.dueDate) {
       return NextResponse.json(
-        { error: "Due date is required" },
+        { error: "Name and due date are required" },
         { status: 400 }
       );
     }
 
     // Create the milestone
-    const newMilestone = await db
+    const [newMilestone] = await db
       .insert(milestones)
       .values({
         projectId,
         name: data.name,
         description: data.description || null,
-        dueDate: data.dueDate,
+        dueDate: new Date(data.dueDate),
         isCompleted: data.isCompleted || false,
         completedDate: data.completedDate ? new Date(data.completedDate) : null,
       })
       .returning();
 
-    return NextResponse.json(newMilestone[0], { status: 201 });
+    // Format the response
+    const formattedMilestone: Milestone = {
+      id: newMilestone.id,
+      name: newMilestone.name,
+      description: newMilestone.description,
+      dueDate: newMilestone.dueDate ? newMilestone.dueDate.toISOString() : null,
+      completedDate: newMilestone.completedDate
+        ? newMilestone.completedDate.toISOString()
+        : null,
+      isCompleted: newMilestone.isCompleted,
+    };
+
+    return NextResponse.json(formattedMilestone, { status: 201 });
   } catch (error) {
     console.error("Error creating milestone:", error);
     return NextResponse.json(

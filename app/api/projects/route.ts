@@ -11,6 +11,12 @@ import {
 import { count, eq, and, sql, not, asc, desc, like, sum } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import {
+  Project,
+  ProjectCreateInput,
+  ProjectStatus,
+  PaginatedResponse,
+} from "@/lib/types";
 
 // GET /api/projects - List all projects with pagination, sorting, filtering
 export async function GET(req: NextRequest) {
@@ -69,17 +75,7 @@ export async function GET(req: NextRequest) {
             conditions.push(like(projects.name, `%${value}%`));
             break;
           case "status":
-            conditions.push(
-              eq(
-                projects.status,
-                value as
-                  | "planning"
-                  | "active"
-                  | "on_hold"
-                  | "completed"
-                  | "cancelled"
-              )
-            );
+            conditions.push(eq(projects.status, value as ProjectStatus));
             break;
           case "clientId":
             conditions.push(eq(projects.clientId, value));
@@ -188,43 +184,53 @@ export async function GET(req: NextRequest) {
             ? taskProgress
             : 0;
 
-        return {
+        const projectData: Project = {
           id: project.id,
           name: project.name,
           description: project.description,
-          status: project.status,
-          startDate: project.startDate,
-          targetEndDate: project.targetEndDate,
-          actualEndDate: project.actualEndDate,
+          status: project.status as ProjectStatus,
+          startDate: project.startDate ? project.startDate.toISOString() : null,
+          targetEndDate: project.targetEndDate
+            ? project.targetEndDate.toISOString()
+            : null,
+          actualEndDate: project.actualEndDate
+            ? project.actualEndDate.toISOString()
+            : null,
           client: project.clientId
             ? {
                 id: project.clientId,
-                name: project.client,
+                name: project.client || "",
               }
             : null,
           manager: project.managerId
             ? {
                 id: project.managerId,
-                name: `${project.managerName} ${project.managerLastName}`,
+                name: `${project.managerName || ""} ${
+                  project.managerLastName || ""
+                }`.trim(),
               }
             : null,
-          budget: project.budget,
+          budget: project.budget?.toString() || undefined,
           taskCount: project.taskCount,
           progress,
-          createdAt: project.createdAt,
-          updatedAt: project.updatedAt,
+          createdAt: project.createdAt.toISOString(),
+          updatedAt: project.updatedAt.toISOString(),
         };
+
+        return projectData;
       })
     );
 
     // Return paginated results
-    return NextResponse.json({
+    const response: PaginatedResponse<Project> = {
       data: projectsWithDetails,
       totalCount,
       pageCount: Math.ceil(totalCount / pageSize),
       page,
       pageSize,
-    });
+    };
+
+    return NextResponse.json(response);
   } catch (error) {
     console.error("Error fetching projects:", error);
     return NextResponse.json(
@@ -244,7 +250,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const data = await req.json();
+    const data: ProjectCreateInput = await req.json();
 
     // Validate required fields
     if (!data.name) {
@@ -261,8 +267,8 @@ export async function POST(req: NextRequest) {
         name: data.name,
         description: data.description,
         status: data.status || "planning",
-        startDate: data.startDate,
-        targetEndDate: data.targetEndDate,
+        startDate: data.startDate ? new Date(data.startDate) : null,
+        targetEndDate: data.targetEndDate ? new Date(data.targetEndDate) : null,
         clientId: data.clientId,
         productId: data.productId,
         budget: data.budget,

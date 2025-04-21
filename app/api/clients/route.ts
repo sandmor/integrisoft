@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClients } from "@/lib/actions/clients";
 import { tryCatch } from "@/lib/error-handler";
+import { GetClientsParams, Client } from "@/lib/types/clients";
+import { PaginatedResponse } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -33,7 +35,7 @@ export async function GET(request: NextRequest) {
           pageSize,
           sorts: sortFields,
           filters: filterFields,
-        }),
+        } as GetClientsParams),
       {
         customErrorMessage: "Failed to fetch clients data",
       }
@@ -41,11 +43,15 @@ export async function GET(request: NextRequest) {
 
     const { data, count } = clients || { data: [], count: 0 };
 
-    return NextResponse.json({
+    const response: PaginatedResponse<Client> = {
       data,
+      totalCount: count,
       pageCount: Math.ceil(count / pageSize),
-      count,
-    });
+      page,
+      pageSize,
+    };
+
+    return NextResponse.json(response);
   } catch (error) {
     console.error("Error fetching clients:", error);
     return NextResponse.json(

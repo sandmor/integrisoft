@@ -4,6 +4,7 @@ import { projectTeamMembers, employees, users } from "@/lib/db/schema";
 import { eq, and, not } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { TeamMember, TeamMemberUpdateInput } from "@/lib/types";
 
 // GET /api/projects/[projectId]/team-members/[id] - Get a specific team member
 export async function GET(
@@ -49,15 +50,19 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({
+    const formattedTeamMember: TeamMember = {
       id: teamMember.id,
       employeeId: teamMember.employeeId,
       name: `${teamMember.employeeName} ${teamMember.employeeLastName}`,
       role: teamMember.role,
       allocationPercentage: teamMember.allocationPercentage,
-      startDate: teamMember.startDate,
-      endDate: teamMember.endDate,
-    });
+      startDate: teamMember.startDate
+        ? teamMember.startDate.toISOString()
+        : null,
+      endDate: teamMember.endDate ? teamMember.endDate.toISOString() : null,
+    };
+
+    return NextResponse.json(formattedTeamMember);
   } catch (error) {
     console.error("Error fetching team member:", error);
     return NextResponse.json(
@@ -81,7 +86,8 @@ export async function PATCH(
     }
 
     const { projectId, id } = await params;
-    const { role, allocationPercentage, startDate, endDate } = await req.json();
+    const updateData: TeamMemberUpdateInput = await req.json();
+    const { role, allocationPercentage, startDate, endDate } = updateData;
 
     // Verify that team member exists and belongs to the project
     const [existingMember] = await db
@@ -106,8 +112,8 @@ export async function PATCH(
     await db
       .update(projectTeamMembers)
       .set({
-        role: role,
-        allocationPercentage: allocationPercentage,
+        role,
+        allocationPercentage,
         startDate: startDate ? new Date(startDate) : undefined,
         endDate: endDate ? new Date(endDate) : null,
         updatedAt: new Date(),
@@ -131,15 +137,21 @@ export async function PATCH(
       .leftJoin(employees, eq(projectTeamMembers.employeeId, employees.id))
       .leftJoin(users, eq(employees.userId, users.id));
 
-    return NextResponse.json({
+    const teamMember: TeamMember = {
       id: updatedMember.id,
       employeeId: updatedMember.employeeId,
       name: `${updatedMember.employeeName} ${updatedMember.employeeLastName}`,
       role: updatedMember.role,
       allocationPercentage: updatedMember.allocationPercentage,
-      startDate: updatedMember.startDate,
-      endDate: updatedMember.endDate,
-    });
+      startDate: updatedMember.startDate
+        ? updatedMember.startDate.toISOString()
+        : null,
+      endDate: updatedMember.endDate
+        ? updatedMember.endDate.toISOString()
+        : null,
+    };
+
+    return NextResponse.json(teamMember);
   } catch (error) {
     console.error("Error updating team member:", error);
     return NextResponse.json(

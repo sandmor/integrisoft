@@ -14,6 +14,11 @@ import {
 import { eq, and, not, sql, count, sum, desc } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import {
+  ProjectDetailResponse,
+  ProjectUpdateInput,
+  ProjectStatus,
+} from "@/lib/types";
 
 // GET /api/projects/[projectId] - Get a single project by ID
 export async function GET(
@@ -59,8 +64,9 @@ export async function GET(
       .from(projects)
       .where(and(eq(projects.id, projectId), not(eq(projects.isDeleted, true))))
       .leftJoin(clients, eq(projects.clientId, clients.id))
-      .leftJoin(users, eq(projects.managerId, employees.id))
-      .leftJoin(employees, eq(users.id, employees.userId));
+      .leftJoin(employees, eq(projects.managerId, employees.id))
+      .leftJoin(users, eq(employees.userId, users.id))
+      .leftJoin(products, eq(projects.productId, products.id));
 
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 });
@@ -140,28 +146,32 @@ export async function GET(
       totalBudget > 0 ? Math.round((budgetSpent / totalBudget) * 100) : 0;
 
     // Format the response
-    const projectDetails = {
+    const projectDetails: ProjectDetailResponse = {
       id: project.id,
       name: project.name,
       description: project.description,
-      status: project.status,
-      startDate: project.startDate,
-      targetEndDate: project.targetEndDate,
-      actualEndDate: project.actualEndDate,
+      status: project.status as ProjectStatus,
+      startDate: project.startDate ? project.startDate.toISOString() : null,
+      targetEndDate: project.targetEndDate
+        ? project.targetEndDate.toISOString()
+        : null,
+      actualEndDate: project.actualEndDate
+        ? project.actualEndDate.toISOString()
+        : null,
       client: project.clientId
         ? {
             id: project.clientId,
-            name: project.clientName,
-            industry: project.clientIndustry,
-            website: project.clientWebsite,
+            name: project.clientName || "",
+            industry: project.clientIndustry || undefined,
+            website: project.clientWebsite || undefined,
           }
         : null,
       manager: project.managerId
         ? {
             id: project.managerId,
-            name: project.managerName + " " + project.managerLastName,
-            position: project.managerPosition,
-            department: project.managerDepartment,
+            name: `${project.managerName} ${project.managerLastName}`,
+            position: project.managerPosition || undefined,
+            department: project.managerDepartment || undefined,
           }
         : null,
       progress,
@@ -176,9 +186,9 @@ export async function GET(
         completed: milestoneStats.completed,
       },
       budget: {
-        total: totalBudget,
-        spent: budgetSpent,
-        remaining: budgetRemaining,
+        total: totalBudget.toString(),
+        spent: budgetSpent.toString(),
+        remaining: budgetRemaining.toString(),
         percentUsed: budgetPercentUsed,
       },
     };
@@ -207,7 +217,7 @@ export async function PATCH(
     }
 
     const { projectId } = await params;
-    const data = await req.json();
+    const data: ProjectUpdateInput = await req.json();
 
     // Check if project exists
     const [existingProject] = await db
@@ -228,9 +238,11 @@ export async function PATCH(
         name: data.name,
         description: data.description,
         status: data.status,
-        startDate: data.startDate,
-        targetEndDate: data.targetEndDate,
-        actualEndDate: data.actualEndDate,
+        startDate: data.startDate ? new Date(data.startDate) : undefined,
+        targetEndDate: data.targetEndDate
+          ? new Date(data.targetEndDate)
+          : undefined,
+        actualEndDate: data.actualEndDate ? new Date(data.actualEndDate) : null,
         clientId: data.clientId,
         productId: data.productId,
         budget: data.budget,
@@ -242,6 +254,7 @@ export async function PATCH(
 
     // Record the activity
     await db.insert(activitiesFeed).values({
+      id: Math.random().toString(36).substring(2, 15),
       userId: session.user.id,
       action: "update",
       module: "projects",
@@ -299,6 +312,7 @@ export async function DELETE(
 
     // Record the activity
     await db.insert(activitiesFeed).values({
+      id: Math.random().toString(36).substring(2, 15),
       userId: session.user.id,
       action: "delete",
       module: "projects",

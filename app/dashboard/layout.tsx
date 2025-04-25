@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { DashboardBreadcrumb } from "@/components/dashboard/breadcrumb";
+import { MobileMenu } from "@/components/dashboard/mobile-menu";
 import { getEntityNameById } from "@/lib/actions/dashboard";
 import StoreProvider from "../../components/providers/store-provider";
 
@@ -56,7 +57,7 @@ export default async function DashboardLayout({
           {/* Header - server rendered */}
           <header className="bg-background border-b h-16 flex items-center justify-between px-6 sticky top-0 z-10">
             <div className="lg:hidden">
-              {/* Mobile menu trigger placeholder */}
+              <MobileMenu />
             </div>
             <div className="flex-1 lg:hidden"></div>
             <div>

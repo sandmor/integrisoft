@@ -23,7 +23,7 @@ interface SidebarItem {
 }
 
 // Use the dashboard modules to generate sidebar items
-const sidebarItems: SidebarItem[] = [
+export const sidebarItems: SidebarItem[] = [
   {
     title: "Dashboard",
     icon: <LayoutDashboard className="size-5" />,

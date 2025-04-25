@@ -4,6 +4,7 @@ import { reorderTasksInColumn } from "@/lib/db/kanban-order";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { TaskReorderInput, TaskStatus } from "@/lib/types";
+import { revalidatePath } from "next/cache";
 
 // POST /api/projects/[projectId]/tasks/reorder - Reorder tasks within a column
 export async function POST(
@@ -37,6 +38,10 @@ export async function POST(
 
     // Update the order of tasks in the column
     await reorderTasksInColumn(projectId, status as TaskStatus, taskIds);
+
+    // Revalidate relevant paths
+    revalidatePath(`/dashboard/projects/${projectId}`);
+    revalidatePath(`/dashboard/projects/${projectId}/tasks`);
 
     return NextResponse.json({ success: true });
   } catch (error) {

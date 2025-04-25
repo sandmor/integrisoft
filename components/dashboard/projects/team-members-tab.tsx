@@ -40,10 +40,10 @@ import { Calendar, MoreVertical, PlusCircle, Users } from "lucide-react";
 import { toast } from "sonner";
 import { TeamMemberForm } from "./team-member-form";
 import {
-  TeamMember,
   useGetTeamMembersQuery,
   useDeleteTeamMemberMutation,
 } from "@/lib/redux/projectsApi";
+import { TeamMember } from "@/lib/types";
 
 type Employee = {
   id: string;

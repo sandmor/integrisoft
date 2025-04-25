@@ -41,7 +41,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Task } from "@/lib/redux/projectsApi";
+import { Task } from "@/lib/types";
 
 type TaskCalendarProps = {
   projectId: string;

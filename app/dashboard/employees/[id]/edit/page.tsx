@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
-  getEmployee,
+  getEmployeeById,
   getDepartments,
   getPositions,
 } from "@/lib/actions/employees";
@@ -16,7 +16,7 @@ export default async function EditEmployeePage({
 }) {
   const { id } = await params;
   const [employee, departments, positions] = await Promise.all([
-    getEmployee(id),
+    getEmployeeById(id),
     getDepartments(),
     getPositions(),
   ]);
@@ -40,7 +40,7 @@ export default async function EditEmployeePage({
 
       <div>
         <h2 className="text-2xl font-bold tracking-tight">
-          Edit Employee: {employee.name} {employee.lastName}
+          Edit Employee: {employee.firstName} {employee.lastName}
         </h2>
         <p className="text-muted-foreground">
           Update the employee's information using the form below.

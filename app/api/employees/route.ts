@@ -12,6 +12,7 @@ import {
   CreateEmployeeRequest,
 } from "@/lib/types/employees";
 import { PaginatedResponse } from "@/lib/types";
+import { revalidatePath } from "next/cache";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -107,6 +108,9 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
+
+    revalidatePath("/dashboard/employees");
+    revalidatePath(`/dashboard/employees/${id}`);
 
     const newEmployee = await tryCatch(() => getEmployeeById(id), {
       customErrorMessage: "Failed to fetch new employee data",

@@ -22,7 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Task } from "@/lib/redux/projectsApi";
+import { Task } from "@/lib/types";
 
 type Column = {
   id: string;
@@ -118,8 +118,10 @@ export function TaskBoard({
         // Then send to the server
         await reorderTasks({
           projectId,
-          status: columnId as "todo" | "in_progress" | "review" | "done",
-          taskIds,
+          reorderInput: {
+            status: columnId as "todo" | "in_progress" | "review" | "done",
+            taskIds,
+          },
         });
       } catch (error) {
         console.error("Failed to save column order:", error);

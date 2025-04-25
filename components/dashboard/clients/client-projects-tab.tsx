@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/card";
 import { formatDate } from "@/lib/utils";
 import { useGetProjectsByClientQuery } from "@/lib/redux/projectsApi";
-import type { Project } from "@/lib/redux/projectsApi";
+import { Project } from "@/lib/types";
 
 interface ClientProjectsTabProps {
   clientId: string;

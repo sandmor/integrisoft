@@ -4,6 +4,7 @@ import { milestones } from "@/lib/db/schema";
 import { eq, and, not } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { Milestone, MilestoneUpdateInput } from "@/lib/types";
 
 // GET /api/projects/[projectId]/milestones/[milestoneId] - Get a single milestone by ID
@@ -124,6 +125,13 @@ export async function PATCH(
       isCompleted: updatedMilestone.isCompleted,
     };
 
+    // Revalidate relevant paths
+    revalidatePath(`/dashboard/projects/${projectId}`);
+    revalidatePath(`/dashboard/projects/${projectId}/milestones`);
+    revalidatePath(
+      `/dashboard/projects/${projectId}/milestones/${milestoneId}`
+    );
+
     return NextResponse.json(formattedMilestone);
   } catch (error) {
     console.error("Error updating milestone:", error);
@@ -176,6 +184,13 @@ export async function DELETE(
         updatedAt: new Date(),
       })
       .where(eq(milestones.id, milestoneId));
+
+    // Revalidate relevant paths
+    revalidatePath(`/dashboard/projects/${projectId}`);
+    revalidatePath(`/dashboard/projects/${projectId}/milestones`);
+    revalidatePath(
+      `/dashboard/projects/${projectId}/milestones/${milestoneId}`
+    );
 
     return NextResponse.json({ success: true });
   } catch (error) {

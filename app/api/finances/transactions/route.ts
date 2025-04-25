@@ -28,6 +28,7 @@ import {
 } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { revalidatePath } from "next/cache";
 import {
   TransactionListResponse,
   TransactionCreateInput,
@@ -303,6 +304,10 @@ export async function POST(req: NextRequest) {
       .leftJoin(users, eq(transactions.createdById, users.id))
       .where(eq(transactions.id, transaction[0].id))
       .limit(1);
+
+    // Revalidate relevant paths
+    revalidatePath("/dashboard/finances/transactions");
+    revalidatePath("/dashboard/finances");
 
     return NextResponse.json(completeTransaction[0], { status: 201 });
   } catch (error) {

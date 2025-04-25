@@ -11,6 +11,7 @@ import { eq, and, not, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { createId } from "@paralleldrive/cuid2";
+import { revalidatePath } from "next/cache";
 import {
   moveTaskBetweenColumns,
   removeTaskFromOrder,
@@ -302,6 +303,11 @@ export async function PATCH(
       data: formattedTask,
     };
 
+    // Revalidate relevant paths
+    revalidatePath(`/dashboard/projects/${projectId}`);
+    revalidatePath(`/dashboard/projects/${projectId}/tasks`);
+    revalidatePath(`/dashboard/projects/${projectId}/tasks/${taskId}`);
+
     return NextResponse.json(response);
   } catch (error) {
     console.error("Error updating task:", error);
@@ -363,6 +369,10 @@ export async function DELETE(
       console.error("Error removing task from order:", error);
       // Continue with the response as we only log the error but don't fail the request
     }
+
+    // Revalidate relevant paths
+    revalidatePath(`/dashboard/projects/${projectId}`);
+    revalidatePath(`/dashboard/projects/${projectId}/tasks`);
 
     return NextResponse.json({ success: true });
   } catch (error) {

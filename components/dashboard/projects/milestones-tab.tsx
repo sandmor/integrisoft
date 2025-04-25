@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MilestoneTimeline } from "@/components/dashboard/projects/milestone-timeline";
-import { Milestone, useGetMilestonesQuery } from "@/lib/redux/projectsApi";
+import { useGetMilestonesQuery } from "@/lib/redux/projectsApi";
 import { Spinner } from "@/components/ui/spinner";
 
 type MilestonesTabProps = {

@@ -38,7 +38,8 @@ import {
   useUpdateEmployeeMutation,
 } from "@/lib/redux/employeesApi";
 
-import { Employee, Department, Position } from "@/lib/actions/employees";
+import { Department, Position } from "@/lib/actions/employees";
+import { EmployeeWithDetails } from "@/lib/types/employees";
 
 // Base validation schema for employee form (without password validation)
 const baseEmployeeSchema = z.object({
@@ -134,7 +135,7 @@ type EmployeeFormValues = z.infer<typeof baseEmployeeSchema>;
 type NewEmployeeFormValues = z.infer<typeof newEmployeeSchema>;
 
 interface UnifiedEmployeeFormProps {
-  initialData?: Employee;
+  initialData?: EmployeeWithDetails;
   departments: Department[];
   positions: Position[];
   isSubmitting?: boolean;
@@ -245,7 +246,7 @@ export function EmployeeForm({
 
   // Set default values based on provided data or empty form
   const defaultValues: Partial<EmployeeFormValues> = {
-    name: initialData?.name || "",
+    name: initialData?.firstName || "",
     lastName: initialData?.lastName || "",
     email: initialData?.email || "",
     departmentId: initialDepartmentId || "",

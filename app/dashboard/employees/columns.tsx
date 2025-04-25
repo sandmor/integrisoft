@@ -2,10 +2,10 @@
 
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { Employee } from "@/lib/actions/employees";
 import { formatDate } from "@/lib/utils";
 import { FileEdit, Trash2, Eye } from "lucide-react";
 import Link from "next/link";
+import { Employee } from "@/lib/types/employees";
 
 export const columns: ColumnDef<Employee>[] = [
   {

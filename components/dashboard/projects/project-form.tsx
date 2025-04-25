@@ -155,14 +155,8 @@ export function ProjectForm({
 
   const onSubmit = async (values: ProjectFormValues) => {
     try {
-      // Parse the budget to a number if present
-      const numericBudget = values.budget
-        ? parseFloat(values.budget)
-        : undefined;
-
       const projectData = {
         ...values,
-        budget: numericBudget,
         startDate: values.startDate
           ? values.startDate.toISOString()
           : undefined,

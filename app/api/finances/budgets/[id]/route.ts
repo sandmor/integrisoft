@@ -13,11 +13,12 @@ import { auth } from "@/lib/auth";
 import { sql } from "drizzle-orm";
 import { headers } from "next/headers";
 import { BudgetDetail } from "@/lib/types";
+import { revalidatePath } from "next/cache";
 
 // GET /api/finances/budgets/[id] - Get a single budget by ID
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth.api.getSession({
@@ -27,7 +28,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     // Get budget with related entities
     const budget = await db
@@ -219,7 +220,7 @@ export async function GET(
 // PATCH /api/finances/budgets/[id] - Update a budget
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth.api.getSession({
@@ -229,7 +230,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     const data = await req.json();
 
     // Validate if budget exists
@@ -425,6 +426,21 @@ export async function PATCH(
         ? (parseFloat(spentAmount) / parseFloat(completeBudget[0].amount)) * 100
         : 0;
 
+    // Revalidate relevant paths
+    revalidatePath("/dashboard/finances/budgets");
+    revalidatePath("/dashboard/finances");
+    revalidatePath(`/dashboard/finances/budgets/${id}`);
+
+    // Also revalidate related entity paths if they exist
+    if (completeBudget[0].costCenterId) {
+      revalidatePath(
+        `/dashboard/finances/cost-centers/${completeBudget[0].costCenterId}`
+      );
+    }
+    if (completeBudget[0].projectId) {
+      revalidatePath(`/dashboard/projects/${completeBudget[0].projectId}`);
+    }
+
     return NextResponse.json({
       ...completeBudget[0],
       spentAmount,
@@ -443,7 +459,7 @@ export async function PATCH(
 // DELETE /api/finances/budgets/[id] - Delete a budget (soft delete)
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth.api.getSession({
@@ -453,7 +469,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     // Validate if budget exists
     const existingBudget = await db
@@ -474,6 +490,11 @@ export async function DELETE(
         updatedAt: new Date(),
       })
       .where(eq(budgets.id, id));
+
+    // Revalidate relevant paths
+    revalidatePath("/dashboard/finances/budgets");
+    revalidatePath("/dashboard/finances");
+    revalidatePath(`/dashboard/finances/budgets/${id}`);
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -6,6 +6,7 @@ import {
   ClientInteraction,
   AddClientInteractionRequest,
 } from "@/lib/types/clients";
+import { revalidatePath } from "next/cache";
 
 // GET /api/clients/[id]/interactions - Get interactions for a specific client
 export async function GET(
@@ -67,6 +68,11 @@ export async function POST(
     const newInteraction = updatedClient?.interactions.find(
       (interaction) => interaction.id === interactionId
     ) as ClientInteraction | undefined;
+
+    // Revalidate relevant paths
+    revalidatePath("/dashboard/clients");
+    revalidatePath(`/dashboard/clients/${id}`);
+    revalidatePath(`/dashboard/clients/${id}/interactions`);
 
     return NextResponse.json(newInteraction);
   } catch (error) {

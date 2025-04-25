@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { deleteClientContact } from "@/lib/actions/clients";
 import { tryCatch } from "@/lib/error-handler";
 import { auth } from "@/lib/auth";
+import { revalidatePath } from "next/cache";
 
 // DELETE /api/contacts/[id] - Delete a contact
 export async function DELETE(
@@ -18,6 +19,9 @@ export async function DELETE(
     await tryCatch(() => deleteClientContact(id), {
       customErrorMessage: "Failed to delete contact",
     });
+
+    // Revalidate relevant paths
+    revalidatePath("/dashboard/clients");
 
     return NextResponse.json({ success: true });
   } catch (error) {

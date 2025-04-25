@@ -40,8 +40,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Milestone, useDeleteMilestoneMutation } from "@/lib/redux/projectsApi";
+import { useDeleteMilestoneMutation } from "@/lib/redux/projectsApi";
 import { toast } from "sonner";
+import { Milestone } from "@/lib/types";
 
 type MilestoneTimelineProps = {
   milestones: Milestone[];

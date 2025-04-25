@@ -28,6 +28,7 @@ import {
 import { auth } from "@/lib/auth";
 import { sql } from "drizzle-orm";
 import { headers } from "next/headers";
+import { revalidatePath } from "next/cache";
 
 // GET /api/finances/budgets - Get all budgets with filtering, sorting and pagination
 export async function GET(req: NextRequest) {
@@ -407,6 +408,10 @@ export async function POST(req: NextRequest) {
 
     // Include warning about overlapping budgets if any
     if (hasOverlapping) {
+      // Revalidate relevant paths
+      revalidatePath("/dashboard/finances/budgets");
+      revalidatePath("/dashboard/finances");
+
       return NextResponse.json(
         {
           ...budget,
@@ -416,6 +421,10 @@ export async function POST(req: NextRequest) {
         { status: 201 }
       );
     }
+
+    // Revalidate relevant paths
+    revalidatePath("/dashboard/finances/budgets");
+    revalidatePath("/dashboard/finances");
 
     return NextResponse.json(budget, { status: 201 });
   } catch (error) {

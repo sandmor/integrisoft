@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Eye, Edit, Trash } from "lucide-react";
-import { BudgetListItem } from "@/lib/redux/financesApi";
+import { BudgetListItem } from "@/lib/types";
 
 export const columns: ColumnDef<BudgetListItem>[] = [
   {

@@ -11,11 +11,12 @@ import { eq, and } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { TransactionDetail, TransactionUpdateInput } from "@/lib/types";
+import { revalidatePath } from "next/cache";
 
 // GET /api/finances/transactions/[id] - Get a single transaction by ID
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth.api.getSession({
@@ -25,7 +26,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     const transaction = await db
       .select({
@@ -105,7 +106,7 @@ export async function GET(
 // PATCH /api/finances/transactions/[id] - Update a transaction
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth.api.getSession({
@@ -115,7 +116,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     const data: TransactionUpdateInput = await req.json();
 
     // Validate if transaction exists
@@ -213,7 +214,6 @@ export async function PATCH(
       .where(eq(transactions.id, id))
       .limit(1);
 
-    // Convert date field to string to match TransactionDetail type
     const result = updatedTransaction[0];
     const transactionWithStringDate = result
       ? {
@@ -226,6 +226,10 @@ export async function PATCH(
           updatedAt: result.updatedAt.toISOString(),
         }
       : null;
+
+    revalidatePath("/dashboard/finances/transactions");
+    revalidatePath("/dashboard/finances");
+    revalidatePath(`/dashboard/finances/transactions/${id}`);
 
     return NextResponse.json(transactionWithStringDate as TransactionDetail);
   } catch (error) {
@@ -240,7 +244,7 @@ export async function PATCH(
 // DELETE /api/finances/transactions/[id] - Delete a transaction (soft delete)
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth.api.getSession({
@@ -250,7 +254,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     // Validate if transaction exists
     const existingTransaction = await db
@@ -274,6 +278,10 @@ export async function DELETE(
         updatedAt: new Date(),
       })
       .where(eq(transactions.id, id));
+
+    revalidatePath("/dashboard/finances/transactions");
+    revalidatePath("/dashboard/finances");
+    revalidatePath(`/dashboard/finances/transactions/${id}`);
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -5,6 +5,7 @@ import { eq, and, not } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { TeamMember, TeamMemberUpdateInput } from "@/lib/types";
+import { revalidatePath } from "next/cache";
 
 // GET /api/projects/[projectId]/team-members/[id] - Get a specific team member
 export async function GET(
@@ -151,6 +152,11 @@ export async function PATCH(
         : null,
     };
 
+    // Revalidate relevant paths
+    revalidatePath(`/dashboard/projects/${projectId}`);
+    revalidatePath(`/dashboard/projects/${projectId}/team`);
+    revalidatePath(`/dashboard/employees`);
+
     return NextResponse.json(teamMember);
   } catch (error) {
     console.error("Error updating team member:", error);
@@ -203,6 +209,11 @@ export async function DELETE(
         updatedAt: new Date(),
       })
       .where(eq(projectTeamMembers.id, id));
+
+    // Revalidate relevant paths
+    revalidatePath(`/dashboard/projects/${projectId}`);
+    revalidatePath(`/dashboard/projects/${projectId}/team`);
+    revalidatePath(`/dashboard/employees`);
 
     return NextResponse.json({ message: "Team member removed successfully" });
   } catch (error) {

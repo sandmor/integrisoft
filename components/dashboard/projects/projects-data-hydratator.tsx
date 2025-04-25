@@ -1,12 +1,8 @@
 "use client";
 
 import { useAppDispatch } from "@/lib/hooks";
-import {
-  Milestone,
-  projectsApi,
-  TasksResponse,
-  TeamMember,
-} from "@/lib/redux/projectsApi";
+import { projectsApi } from "@/lib/redux/projectsApi";
+import { Milestone, TasksResponse, TeamMember } from "@/lib/types";
 import { useEffect } from "react";
 
 type ProjectsDataHydratatorProps = {

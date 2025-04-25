@@ -3,6 +3,7 @@ import { addClientContact, getClientById } from "@/lib/actions/clients";
 import { tryCatch } from "@/lib/error-handler";
 import { auth } from "@/lib/auth";
 import { ClientContact, AddClientContactRequest } from "@/lib/types/clients";
+import { revalidatePath } from "next/cache";
 
 // GET /api/clients/[id]/contacts - Get contacts for a specific client
 export async function GET(
@@ -65,6 +66,11 @@ export async function POST(
     const newContact = updatedClient?.contacts.find(
       (contact) => contact.id === contactId
     ) as ClientContact | undefined;
+
+    // Revalidate relevant paths
+    revalidatePath("/dashboard/clients");
+    revalidatePath(`/dashboard/clients/${id}`);
+    revalidatePath(`/dashboard/clients/${id}/contacts`);
 
     return NextResponse.json(newContact);
   } catch (error) {

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getEmployee } from "@/lib/actions/employees";
+import { getEmployeeById } from "@/lib/actions/employees";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,7 +28,7 @@ export default async function EmployeePage({
 }) {
   const { id } = await params;
 
-  const employee = await getEmployee(id);
+  const employee = await getEmployeeById(id);
 
   if (!employee) {
     notFound();
@@ -65,12 +65,12 @@ export default async function EmployeePage({
           <CardContent className="space-y-4">
             <div className="flex flex-col items-center space-y-4 pb-6 border-b">
               <div className="h-24 w-24 rounded-full bg-primary/10 flex items-center justify-center text-lg font-bold text-primary">
-                {employee.name[0]}
+                {employee.firstName[0]}
                 {employee.lastName[0]}
               </div>
               <div className="text-center">
                 <h3 className="text-xl font-semibold">
-                  {employee.name} {employee.lastName}
+                  {employee.firstName} {employee.lastName}
                 </h3>
                 {employee.position && (
                   <p className="text-muted-foreground">{employee.position}</p>

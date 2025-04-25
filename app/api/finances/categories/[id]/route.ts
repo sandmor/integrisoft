@@ -4,12 +4,13 @@ import { transactionCategories, transactions } from "@/lib/db/schema";
 import { count, eq, and, not } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { TransactionCategoryDetail } from "@/lib/types";
 
 // GET /api/finances/categories/[id] - Get a single transaction category
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth.api.getSession({
@@ -19,7 +20,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     const category = await db
       .select()
@@ -112,7 +113,7 @@ export async function GET(
 // PATCH /api/finances/categories/[id] - Update a transaction category
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth.api.getSession({
@@ -122,7 +123,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     const data = await req.json();
 
     // Validate if category exists
@@ -290,6 +291,11 @@ export async function PATCH(
       .where(eq(transactionCategories.id, id))
       .returning();
 
+    // Revalidate relevant paths
+    revalidatePath("/dashboard/finances/categories");
+    revalidatePath("/dashboard/finances");
+    revalidatePath(`/dashboard/finances/categories/${id}`);
+
     return NextResponse.json(updatedCategory[0]);
   } catch (error) {
     console.error("Error updating transaction category:", error);
@@ -303,7 +309,7 @@ export async function PATCH(
 // DELETE /api/finances/categories/[id] - Delete a transaction category
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth.api.getSession({
@@ -313,7 +319,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     // Validate if category exists
     const existingCategory = await db
@@ -375,6 +381,11 @@ export async function DELETE(
         updatedAt: new Date(),
       })
       .where(eq(transactionCategories.id, id));
+
+    // Revalidate relevant paths
+    revalidatePath("/dashboard/finances/categories");
+    revalidatePath("/dashboard/finances");
+    revalidatePath(`/dashboard/finances/categories/${id}`);
 
     return NextResponse.json({ success: true });
   } catch (error) {

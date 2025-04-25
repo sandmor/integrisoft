@@ -4,6 +4,7 @@ import { transactionCategories, transactionTypeEnum } from "@/lib/db/schema";
 import { count, eq, and, not, asc, desc, like, isNull } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { revalidatePath } from "next/cache";
 import {
   TransactionCategoryWithChildren,
   TransactionCategoryItem,
@@ -203,6 +204,10 @@ export async function POST(req: NextRequest) {
       createdAt: newCategory[0].createdAt.toISOString(),
       updatedAt: newCategory[0].updatedAt.toISOString(),
     };
+
+    // Revalidate relevant paths
+    revalidatePath("/dashboard/finances/categories");
+    revalidatePath("/dashboard/finances");
 
     return NextResponse.json(formattedCategory as TransactionCategoryItem, {
       status: 201,

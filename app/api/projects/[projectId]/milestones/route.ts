@@ -4,6 +4,7 @@ import { milestones } from "@/lib/db/schema";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { Milestone, MilestoneCreateInput } from "@/lib/types";
+import { revalidatePath } from "next/cache";
 
 // GET /api/projects/[projectId]/milestones - Get all milestones for a project
 export async function GET(
@@ -114,6 +115,10 @@ export async function POST(
         : null,
       isCompleted: newMilestone.isCompleted,
     };
+
+    // Revalidate relevant paths
+    revalidatePath(`/dashboard/projects/${projectId}`);
+    revalidatePath(`/dashboard/projects/${projectId}/milestones`);
 
     return NextResponse.json(formattedMilestone, { status: 201 });
   } catch (error) {

@@ -147,6 +147,9 @@ export function TaskForm({
           ? values.startDate.toISOString()
           : values.startDate,
         dueDate: values.dueDate ? values.dueDate.toISOString() : values.dueDate,
+        estimatedHours: values.estimatedHours
+          ? values.estimatedHours.toString()
+          : null,
       };
 
       if (isEdit && task) {

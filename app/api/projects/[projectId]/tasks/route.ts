@@ -11,6 +11,7 @@ import { eq, and, not, sql, desc } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { createId } from "@paralleldrive/cuid2";
+import { revalidatePath } from "next/cache";
 import {
   TaskStatus,
   addTaskToOrder,
@@ -360,6 +361,10 @@ export async function POST(
           }
         : null,
     };
+
+    // Revalidate relevant paths
+    revalidatePath(`/dashboard/projects/${projectId}`);
+    revalidatePath(`/dashboard/projects/${projectId}/tasks`);
 
     return NextResponse.json(formattedTask, { status: 201 });
   } catch (error) {

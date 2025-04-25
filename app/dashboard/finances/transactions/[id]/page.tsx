@@ -18,12 +18,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -33,15 +27,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { format } from "date-fns";
-import {
-  CalendarIcon,
-  Edit,
-  Trash,
-  CheckCircle,
-  XCircle,
-  History,
-} from "lucide-react";
+import { Edit, Trash, CheckCircle, XCircle, History } from "lucide-react";
 import Link from "next/link";
 
 export const metadata: Metadata = {
@@ -49,16 +35,17 @@ export const metadata: Metadata = {
   description: "View and manage transaction details",
 };
 
-export default function TransactionDetailsPage({
+export default async function TransactionDetailsPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   // In a real app, you would fetch the transaction details based on params.id
 
   // Mock transaction data for demonstration
   const transaction = {
-    id: params.id,
+    id: id,
     date: "2025-04-15",
     type: "income",
     category: "Sales",
@@ -243,7 +230,7 @@ export default function TransactionDetailsPage({
           </form>
         </CardContent>
         <CardFooter className="flex justify-end">
-          <Link href={`/dashboard/finances/transactions/${params.id}/edit`}>
+          <Link href={`/dashboard/finances/transactions/${id}/edit`}>
             <Button>
               <Edit className="h-4 w-4 mr-2" />
               Edit Transaction

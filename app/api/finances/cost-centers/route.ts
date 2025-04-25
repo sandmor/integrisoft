@@ -9,6 +9,7 @@ import {
 import { count, eq, and, not, asc, desc, like, sum } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { CostCenterListItem, CostCenterWithStats } from "@/lib/types";
 
 // GET /api/finances/cost-centers - Get all cost centers
@@ -259,6 +260,10 @@ export async function POST(req: NextRequest) {
       createdAt: completeCostCenter[0].createdAt.toISOString(),
       updatedAt: completeCostCenter[0].updatedAt.toISOString(),
     };
+
+    // Revalidate relevant paths
+    revalidatePath("/dashboard/finances/cost-centers");
+    revalidatePath("/dashboard/finances");
 
     return NextResponse.json(formattedCostCenter, { status: 201 });
   } catch (error) {

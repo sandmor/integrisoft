@@ -28,11 +28,8 @@ import { TaskCalendar } from "./task-calendar";
 import {
   useGetTasksQuery,
   useUpdateTaskMutation,
-  Task,
-  projectsApi,
-  TasksResponse,
 } from "@/lib/redux/projectsApi";
-import { useAppDispatch } from "@/lib/hooks";
+import { Task } from "@/lib/types";
 
 type TasksTabProps = {
   projectId: string;

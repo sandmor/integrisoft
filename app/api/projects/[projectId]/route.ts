@@ -19,6 +19,7 @@ import {
   ProjectUpdateInput,
   ProjectStatus,
 } from "@/lib/types";
+import { revalidatePath } from "next/cache";
 
 // GET /api/projects/[projectId] - Get a single project by ID
 export async function GET(
@@ -264,6 +265,10 @@ export async function PATCH(
       isSystem: false,
     });
 
+    // Revalidate relevant paths
+    revalidatePath("/dashboard/projects");
+    revalidatePath(`/dashboard/projects/${projectId}`);
+
     return NextResponse.json(updatedProject);
   } catch (error) {
     console.error("Error updating project:", error);
@@ -321,6 +326,10 @@ export async function DELETE(
       timestamp: new Date(),
       isSystem: false,
     });
+
+    // Revalidate relevant paths
+    revalidatePath("/dashboard/projects");
+    revalidatePath(`/dashboard/projects/${projectId}`);
 
     return NextResponse.json({ success: true });
   } catch (error) {

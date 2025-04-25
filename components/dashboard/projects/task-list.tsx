@@ -23,7 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Task } from "@/lib/redux/projectsApi";
+import { Task } from "@/lib/types";
 
 type TaskListProps = {
   projectId: string;

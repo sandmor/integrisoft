@@ -7,6 +7,7 @@ import {
 import { tryCatch } from "@/lib/error-handler";
 import { auth } from "@/lib/auth";
 import { Employee, UpdateEmployeeRequest } from "@/lib/types/employees";
+import { revalidatePath } from "next/cache";
 
 // GET /api/employees/[id] - Get employee by ID
 export async function GET(
@@ -68,6 +69,11 @@ export async function PATCH(
     );
 
     const updatedEmployee = await getEmployeeById(id);
+
+    // Revalidate relevant paths
+    revalidatePath("/dashboard/employees");
+    revalidatePath(`/dashboard/employees/${id}`);
+
     return NextResponse.json(updatedEmployee as Employee);
   } catch (error) {
     console.error("Error updating employee:", error);
@@ -93,6 +99,11 @@ export async function DELETE(
     await tryCatch(() => deleteEmployee(id), {
       customErrorMessage: "Failed to delete employee",
     });
+
+    // Revalidate relevant paths
+    revalidatePath("/dashboard/employees");
+    revalidatePath(`/dashboard/employees/${id}`);
+    revalidatePath(`/dashboard/employees/${id}/*`);
 
     return NextResponse.json({ success: true });
   } catch (error) {

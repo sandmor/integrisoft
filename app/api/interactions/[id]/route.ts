@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { deleteClientInteraction } from "@/lib/actions/clients";
 import { tryCatch } from "@/lib/error-handler";
 import { auth } from "@/lib/auth";
+import { revalidatePath } from "next/cache";
 
 // DELETE /api/interactions/[id] - Delete an interaction
 export async function DELETE(
@@ -18,6 +19,9 @@ export async function DELETE(
     await tryCatch(() => deleteClientInteraction(id), {
       customErrorMessage: "Failed to delete interaction",
     });
+
+    // Revalidate relevant paths
+    revalidatePath("/dashboard/clients");
 
     return NextResponse.json({ success: true });
   } catch (error) {

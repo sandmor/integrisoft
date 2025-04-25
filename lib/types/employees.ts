@@ -14,6 +14,13 @@ export interface Employee {
   userId?: string;
   createdAt?: string;
   updatedAt?: string;
+  salary?: string;
+}
+
+export interface EmployeeWithDetails extends Employee {
+  contactEmail?: string;
+  contactPhone?: string;
+  role: "admin" | "manager" | "employee";
 }
 
 // Query parameters for getEmployees

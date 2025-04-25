@@ -8,15 +8,15 @@ import {
   users,
   accounts,
 } from "@/lib/db/schema";
-import { eq, and, or, desc, count, ilike, asc } from "drizzle-orm";
+import { eq, and, desc, count, ilike, asc } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";
-import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import {
   GetEmployeesParams,
   Employee,
   CreateEmployeeRequest,
   UpdateEmployeeRequest,
+  EmployeeWithDetails,
 } from "../types/employees";
 
 // Department type
@@ -232,7 +232,9 @@ export async function getEmployees(options?: GetEmployeesParams): Promise<{
   };
 }
 
-export async function getEmployeeById(id: string): Promise<Employee | null> {
+export async function getEmployeeById(
+  id: string
+): Promise<EmployeeWithDetails | null> {
   const result = await db.query.employees.findFirst({
     with: {
       users: true,
@@ -256,8 +258,12 @@ export async function getEmployeeById(id: string): Promise<Employee | null> {
       ? "inactive"
       : ("active" as "active" | "inactive" | "on-leave"),
     hireDate: result.hireDate.toISOString(),
-    // Optional fields
     userId: result.userId || undefined,
+    contactPhone: result.contactPhone || undefined,
+    contactEmail: result.contactEmail || undefined,
+    salary: result.salary || undefined,
+    role:
+      (result.users?.role as "admin" | "manager" | "employee") || "employee",
     createdAt: result.createdAt?.toISOString(),
     updatedAt: result.updatedAt?.toISOString(),
   };

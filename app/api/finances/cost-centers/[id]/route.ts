@@ -10,11 +10,12 @@ import {
 import { count, eq, and, not, asc, desc, sum, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { revalidatePath } from "next/cache";
 
 // GET /api/finances/cost-centers/[id] - Get a single cost center by ID
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth.api.getSession({
@@ -24,7 +25,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     // Get cost center with department relation
     const costCenter = await db
@@ -181,7 +182,7 @@ export async function GET(
 // PATCH /api/finances/cost-centers/[id] - Update a cost center
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth.api.getSession({
@@ -191,7 +192,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
     const data = await req.json();
 
     // Validate if cost center exists
@@ -291,6 +292,11 @@ export async function PATCH(
       .where(eq(costCenters.id, id))
       .limit(1);
 
+    // Revalidate relevant paths
+    revalidatePath("/dashboard/finances/cost-centers");
+    revalidatePath("/dashboard/finances");
+    revalidatePath(`/dashboard/finances/cost-centers/${id}`);
+
     return NextResponse.json(completeCostCenter[0]);
   } catch (error) {
     console.error("Error updating cost center:", error);
@@ -304,7 +310,7 @@ export async function PATCH(
 // DELETE /api/finances/cost-centers/[id] - Delete a cost center
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth.api.getSession({
@@ -314,7 +320,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     // Validate if cost center exists
     const existingCostCenter = await db
@@ -369,6 +375,11 @@ export async function DELETE(
         updatedAt: new Date(),
       })
       .where(eq(costCenters.id, id));
+
+    // Revalidate relevant paths
+    revalidatePath("/dashboard/finances/cost-centers");
+    revalidatePath("/dashboard/finances");
+    revalidatePath(`/dashboard/finances/cost-centers/${id}`);
 
     return NextResponse.json({ success: true });
   } catch (error) {

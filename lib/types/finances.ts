@@ -336,6 +336,11 @@ export interface FinancialDashboardResponse {
         expenses: number;
         profit: number;
       };
+      monthlyBreakdown: {
+        month: string;
+        income: string;
+        expenses: string;
+      }[];
     };
     budgets: {
       total: string;

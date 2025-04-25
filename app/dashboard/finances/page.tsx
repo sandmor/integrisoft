@@ -77,32 +77,12 @@ export default function FinanceDashboardPage() {
     budgetTotal > 0 ? Math.round((totalExpenses / budgetTotal) * 100) : 0;
 
   // Generate monthly data for previous 6 months for the charts
-  const currentDate = new Date();
-  const revenueExpenseData = Array.from({ length: 6 }, (_, i) => {
-    const date = new Date();
-    date.setMonth(currentDate.getMonth() - (5 - i));
-    const monthName = date.toLocaleString("default", { month: "short" });
-
-    // For the current month, use actual values from API
-    if (i === 5) {
-      return {
-        name: monthName,
-        revenue: totalRevenue,
-        expenses: totalExpenses,
-      };
-    }
-
-    // For previous months, use random values (in a real app, this would come from the API)
-    // These values will create a somewhat realistic trend leading up to the current month
-    const baseRevenue = totalRevenue * (0.7 + i * 0.06);
-    const baseExpenses = totalExpenses * (0.7 + i * 0.06);
-
-    return {
-      name: monthName,
-      revenue: Math.round(baseRevenue * (0.9 + Math.random() * 0.2)),
-      expenses: Math.round(baseExpenses * (0.9 + Math.random() * 0.2)),
-    };
-  });
+  const revenueExpenseData =
+    financialSummary?.summary.monthlyBreakdown?.map((item) => ({
+      name: item.month,
+      revenue: parseFloat(item.income),
+      expenses: parseFloat(item.expenses),
+    })) || [];
 
   // Generate cash flow data
   const cashFlowData = revenueExpenseData.map((item) => ({

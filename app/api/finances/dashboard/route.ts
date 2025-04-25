@@ -205,7 +205,28 @@ export async function GET() {
       })
     );
 
-    // Compile dashboard data
+    // Generate monthly breakdown for the past 6 months
+    const monthlyBreakdown = await db
+      .select({
+        month: sql<string>`TO_CHAR(${transactions.date}, 'Mon YYYY')`,
+        income: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.type} = 'income' THEN ${transactions.amount} ELSE 0 END), 0)::text`,
+        expenses: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.type} = 'expense' THEN ${transactions.amount} ELSE 0 END), 0)::text`,
+      })
+      .from(transactions)
+      .where(
+        and(
+          eq(transactions.isDeleted, false),
+          between(
+            transactions.date,
+            new Date(currentDate.getFullYear(), currentDate.getMonth() - 5, 1),
+            currentMonthEnd
+          )
+        )
+      )
+      .groupBy(sql`TO_CHAR(${transactions.date}, 'Mon YYYY')`)
+      .orderBy(sql`MIN(${transactions.date})`);
+
+    // Add monthly breakdown to the dashboard data
     const dashboardData = {
       summary: {
         currentMonth: {
@@ -225,6 +246,11 @@ export async function GET() {
           expenses: expenseChange,
           profit: profitChange,
         },
+        monthlyBreakdown: monthlyBreakdown.map((item) => ({
+          month: item.month,
+          income: item.income,
+          expenses: item.expenses,
+        })),
       },
       budgets: {
         total: totalBudgets[0]?.totalBudget || "0",

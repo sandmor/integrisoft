@@ -102,12 +102,17 @@ export function DataTable<TData, TValue>({
   const debouncedFiltersChange = useCallback(
     debounce((filters: ColumnFiltersState) => {
       if (manualFiltering && onFilterChange) {
-        onFilterChange(
-          filters.map((filter) => ({
-            id: filter.id,
-            value: filter.value as string,
-          }))
-        );
+        // Pass the mapped filters to the parent component
+        const mappedFilters = filters.map((filter) => ({
+          id: filter.id,
+          value: filter.value as string,
+        }));
+
+        // Keep internal state for the filters in sync too
+        setColumnFilters(filters);
+
+        // Update parent state
+        onFilterChange(mappedFilters);
       }
     }, 300),
     [manualFiltering, onFilterChange]
@@ -125,7 +130,12 @@ export function DataTable<TData, TValue>({
   const handleSortingChange: OnChangeFn<SortingState> = (updater) => {
     // If manual sorting, delegate to parent
     if (manualSorting && onSortingChange) {
-      onSortingChange(updater);
+      // Update both the parent state and the local state to keep them in sync
+      const newSorting =
+        typeof updater === "function" ? updater(sorting) : updater;
+
+      setSorting(newSorting); // Update local state
+      onSortingChange(updater); // Update parent state
     } else {
       // Otherwise handle locally
       setSorting(updater);
@@ -135,7 +145,12 @@ export function DataTable<TData, TValue>({
   // Async pagination handler with loading state support
   const handlePaginationChange: OnChangeFn<PaginationState> = (updater) => {
     if (manualPagination && onPaginationChange) {
-      onPaginationChange(updater);
+      // Update both the parent state and the local state to keep them in sync
+      const newPagination =
+        typeof updater === "function" ? updater(pagination) : updater;
+
+      setPagination(newPagination); // Update local state
+      onPaginationChange(updater); // Update parent state
     } else {
       setPagination(updater);
     }

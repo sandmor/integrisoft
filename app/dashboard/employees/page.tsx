@@ -152,7 +152,7 @@ export default function EmployeesPage() {
             onSortingChange={handleSortingChange}
             onFilterChange={handleFilterChange}
             filterableColumns={[
-              "name",
+              "firstName",
               "lastName",
               "email",
               "department",

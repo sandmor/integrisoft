@@ -9,7 +9,7 @@ import { Employee } from "@/lib/types/employees";
 
 export const columns: ColumnDef<Employee>[] = [
   {
-    accessorKey: "name",
+    accessorKey: "firstName",
     header: "First Name",
     enableSorting: true,
   },

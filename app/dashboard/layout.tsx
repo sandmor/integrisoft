@@ -49,12 +49,12 @@ export default async function DashboardLayout({
   return (
     <StoreProvider>
       <div className="flex min-h-screen">
-        {/* Client-side interactive sidebar */}
+        {/* Sidebar */}
         <DashboardSidebar />
 
         {/* Main content */}
         <div className="flex flex-col flex-1 lg:ml-64">
-          {/* Header - server rendered */}
+          {/* Header */}
           <header className="bg-background border-b h-16 flex items-center justify-between px-6 sticky top-0 z-10">
             <div className="lg:hidden">
               <MobileMenu />

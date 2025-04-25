@@ -96,7 +96,7 @@ export async function populateTestData(
     const costCenterIds = await generateCostCenters(tx, departmentIds);
 
     console.log("Generating transaction categories...");
-    const categoryIds = await generateTransactionCategories(tx);
+    const transactionCategories = await generateTransactionCategories(tx);
 
     console.log("Generating products...");
     const productIds = await generateProducts(
@@ -170,7 +170,7 @@ export async function populateTestData(
     console.log("Generating transactions...");
     await generateTransactions(
       tx,
-      categoryIds,
+      transactionCategories, // Pass the full transaction categories result object
       costCenterIds,
       projectIds,
       userIds

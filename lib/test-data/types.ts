@@ -28,3 +28,28 @@ export interface DependencyRelation {
   productId: string;
   dependsOnId: string;
 }
+
+// Transaction category types
+export type TransactionType = "income" | "expense" | "transfer";
+
+// Transaction category interface
+export interface TransactionCategory {
+  id: string;
+  name: string;
+  type: TransactionType;
+}
+
+// Grouped transaction categories by type
+export interface TransactionCategoriesResult {
+  allCategoryIds: string[];
+  categoriesByType: {
+    income: TransactionCategory[];
+    expense: TransactionCategory[];
+    transfer: TransactionCategory[];
+  };
+  // Helper to quickly find a category by name and type
+  findByNameAndType: (
+    name: string,
+    type: TransactionType
+  ) => TransactionCategory | undefined;
+}

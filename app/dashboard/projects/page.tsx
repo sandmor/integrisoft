@@ -1,48 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { columns } from "./columns";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { SortingState, PaginationState } from "@tanstack/react-table";
-
-// Fetch projects data from API
-async function fetchProjects({
-  pageIndex,
-  pageSize,
-  sorting,
-  filters,
-}: {
-  pageIndex: number;
-  pageSize: number;
-  sorting: SortingState;
-  filters: { id: string; value: string }[];
-}) {
-  const params = new URLSearchParams();
-  params.append("page", pageIndex.toString());
-  params.append("pageSize", pageSize.toString());
-
-  sorting.forEach((sort) => {
-    params.append("sorts", `${sort.id}:${sort.desc ? "desc" : "asc"}`);
-  });
-
-  filters.forEach((filter) => {
-    if (filter.value) {
-      params.append("filters", `${filter.id}:${filter.value}`);
-    }
-  });
-
-  const response = await fetch(`/api/projects?${params.toString()}`);
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch projects");
-  }
-
-  return response.json();
-}
+import { useGetProjectsQuery } from "@/lib/redux/projectsApi";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ProjectsPage() {
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -54,74 +20,71 @@ export default function ProjectsPage() {
     []
   );
 
-  // Loading states
-  const [isPaginationLoading, setIsPaginationLoading] = useState(false);
-  const [isSortingLoading, setIsSortingLoading] = useState(false);
-  const [isFilteringLoading, setIsFilteringLoading] = useState(false);
+  const page = pagination.pageIndex;
+  const pageSize = pagination.pageSize;
 
-  // Query parameters
-  const { pageIndex, pageSize } = pagination;
+  // Convert sorting format from DataTable to API format
+  const sortParams =
+    sorting.length > 0
+      ? sorting.map((sort) => `${sort.desc ? "-" : ""}${sort.id}`)
+      : undefined;
 
-  // Data fetching
-  const { data, isLoading, isError, isFetching } = useQuery({
-    queryKey: ["projects", pageIndex, pageSize, sorting, filters],
-    queryFn: () => fetchProjects({ pageIndex, pageSize, sorting, filters }),
-    placeholderData: keepPreviousData,
+  // Convert filters from DataTable to API format
+  const filterParams =
+    filters.length > 0
+      ? filters
+          .filter((f) => f.value)
+          .map((filter) => `${filter.id}:${filter.value}`)
+      : undefined;
+
+  // Using RTK Query to fetch projects
+  const {
+    data: projectData,
+    isLoading,
+    isFetching,
+  } = useGetProjectsQuery({
+    page,
+    pageSize,
+    filters: filterParams,
+    sorts: sortParams,
   });
 
-  // Update loading states
-  useEffect(() => {
-    if (isFetching) {
-      if (filters.length > 0) {
-        setIsFilteringLoading(true);
-      } else if (sorting.length > 0) {
-        setIsSortingLoading(true);
-      } else {
-        setIsPaginationLoading(true);
-      }
-    } else {
-      setIsFilteringLoading(false);
-      setIsSortingLoading(false);
-      setIsPaginationLoading(false);
-    }
-  }, [isFetching, filters, sorting]);
+  // Handle loading state
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center border-b px-6 py-4">
+          <div>
+            <h2 className="text-xl font-semibold">Projects</h2>
+            <p className="text-sm text-muted-foreground">
+              Track projects, milestones, and tasks
+            </p>
+          </div>
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <div className="p-6">
+          <Skeleton className="h-[500px] w-full" />
+        </div>
+      </div>
+    );
+  }
 
-  const handleFilterChange = useCallback(
-    (newFilters: { id: string; value: string }[]) => {
-      setIsFilteringLoading(true);
-      setFilters(newFilters);
-      setPagination((prev) => ({ ...prev, pageIndex: 0 }));
-    },
-    []
-  );
+  // Handle error state
+  if (projectData === undefined) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] border border-red-200 rounded-md bg-red-50 p-6 mx-6 my-6">
+        <h3 className="text-xl font-semibold text-red-700">
+          Error loading projects
+        </h3>
+        <p className="text-red-600 mt-2">
+          Please try again later or contact support.
+        </p>
+      </div>
+    );
+  }
 
-  const handleSortingChange = useCallback(
-    (updaterOrValue: SortingState | ((prev: SortingState) => SortingState)) => {
-      setIsSortingLoading(true);
-      if (typeof updaterOrValue === "function") {
-        setSorting(updaterOrValue);
-      } else {
-        setSorting(updaterOrValue);
-      }
-    },
-    []
-  );
-
-  const handlePaginationChange = useCallback(
-    (
-      updaterOrValue:
-        | PaginationState
-        | ((prev: PaginationState) => PaginationState)
-    ) => {
-      setIsPaginationLoading(true);
-      if (typeof updaterOrValue === "function") {
-        setPagination(updaterOrValue);
-      } else {
-        setPagination(updaterOrValue);
-      }
-    },
-    []
-  );
+  const projects = projectData?.data || [];
+  const totalPages = projectData?.pageCount || 1;
 
   return (
     <>
@@ -140,28 +103,22 @@ export default function ProjectsPage() {
         </Button>
       </div>
       <div className="p-6">
-        {isError ? (
-          <div className="text-center py-4 text-red-600">
-            Error loading projects. Please try again.
-          </div>
-        ) : (
-          <DataTable
-            columns={columns}
-            data={data?.data || []}
-            isLoading={isLoading}
-            pageCount={data?.pageCount || 0}
-            manualPagination={true}
-            manualSorting={true}
-            manualFiltering={true}
-            onPaginationChange={handlePaginationChange}
-            onSortingChange={handleSortingChange}
-            onFilterChange={handleFilterChange}
-            filterableColumns={["name", "status"]}
-            isPaginationLoading={isPaginationLoading}
-            isSortingLoading={isSortingLoading}
-            isFilteringLoading={isFilteringLoading}
-          />
-        )}
+        <DataTable
+          columns={columns}
+          data={projects}
+          isLoading={isLoading}
+          isPaginationLoading={isFetching && !isLoading}
+          isSortingLoading={isFetching && !isLoading}
+          isFilteringLoading={isFetching && !isLoading}
+          pageCount={totalPages}
+          manualPagination={true}
+          manualSorting={true}
+          manualFiltering={true}
+          onPaginationChange={setPagination}
+          onSortingChange={setSorting}
+          onFilterChange={setFilters}
+          filterableColumns={["name", "status"]}
+        />
       </div>
     </>
   );

@@ -16,11 +16,11 @@ export interface Client {
     id: string | null;
     name: string | null;
   } | null;
+  projectCount: number;
   createdAt?: string;
   updatedAt?: string;
 }
 
-// Contact entity type
 export interface ClientContact {
   id: string;
   firstName: string;

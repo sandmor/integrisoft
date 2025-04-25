@@ -6,18 +6,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Eye } from "lucide-react";
 import { formatDate } from "@/lib/utils";
-
-// Client manager info
-type ClientInfo = {
-  id: string | null;
-  name: string | null;
-};
-
-// Manager info
-type ManagerInfo = {
-  id: string | null;
-  name: string | null;
-};
+import { Project } from "@/lib/types";
 
 type BadgeVariant =
   | "default"
@@ -37,19 +26,7 @@ const statusVariantMap: Record<string, BadgeVariant> = {
   cancelled: "destructive",
 };
 
-export type ProjectTableItem = {
-  id: string;
-  name: string;
-  status: string;
-  startDate: string | null;
-  targetEndDate: string | null;
-  client: ClientInfo | null;
-  manager: ManagerInfo | null;
-  budget: number | null;
-  progress: number;
-};
-
-export const columns: ColumnDef<ProjectTableItem>[] = [
+export const columns: ColumnDef<Project>[] = [
   {
     accessorKey: "name",
     header: "Project Name",
@@ -73,7 +50,7 @@ export const columns: ColumnDef<ProjectTableItem>[] = [
     header: "Client",
     enableSorting: false,
     cell: ({ row }) => {
-      const client = row.getValue("client") as ClientInfo | null;
+      const client: Project["client"] = row.getValue("client");
       return <span>{client?.name || "Internal Project"}</span>;
     },
   },
@@ -82,7 +59,7 @@ export const columns: ColumnDef<ProjectTableItem>[] = [
     header: "Project Manager",
     enableSorting: false,
     cell: ({ row }) => {
-      const manager = row.getValue("manager") as ManagerInfo | null;
+      const manager: Project["manager"] = row.getValue("manager");
       return <span>{manager?.name || "Unassigned"}</span>;
     },
   },

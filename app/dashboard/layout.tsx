@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { DashboardBreadcrumb } from "@/components/dashboard/breadcrumb";
 import { getEntityNameById } from "@/lib/actions/dashboard";
-import StoreProvider from "../StoreProvider";
+import StoreProvider from "../../components/providers/store-provider";
 
 export default async function DashboardLayout({
   children,

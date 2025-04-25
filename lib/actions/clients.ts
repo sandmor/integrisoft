@@ -25,23 +25,6 @@ import {
 export async function getClients(options?: GetClientsParams) {
   const { page = 0, pageSize = 10, sorts = [], filters = [] } = options || {};
 
-  // Build the base query
-  let query = db
-    .select({
-      id: clients.id,
-      name: clients.name,
-      industry: clients.industry,
-      website: clients.website,
-      accountManager: {
-        id: employees.id,
-        name: users.name,
-      },
-    })
-    .from(clients)
-    .leftJoin(employees, eq(clients.accountManagerId, employees.id))
-    .leftJoin(users, eq(employees.userId, users.id))
-    .where(eq(clients.isDeleted, false));
-
   // Prepare filter conditions
   const filterConditions = [];
 
@@ -153,11 +136,11 @@ export async function getClients(options?: GetClientsParams) {
   );
 
   // Return clients with project counts
-  const data = results.map((client) => ({
+  const data: Client[] = results.map((client) => ({
     ...client,
     projectCount: projectCountMap.get(client.id) || 0,
     status: "active" as const, // Adding required status field
-  })) as Client[];
+  }));
 
   return {
     data,

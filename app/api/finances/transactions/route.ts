@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
     const dateFrom = searchParams.get("dateFrom");
     const dateTo = searchParams.get("dateTo");
 
-    const offset = (page - 1) * pageSize;
+    const offset = page * pageSize;
 
     // Build where conditions
     let whereConditions = [eq(transactions.isDeleted, false)];

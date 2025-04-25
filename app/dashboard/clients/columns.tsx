@@ -5,22 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Eye } from "lucide-react";
+import { Client } from "@/lib/types/clients";
 
-type AccountManagerInfo = {
-  id: string | null;
-  name: string | null;
-};
-
-export type ClientTableItem = {
-  id: string;
-  name: string;
-  industry: string | null;
-  website: string | null;
-  accountManager: AccountManagerInfo | null;
-  projectCount: number;
-};
-
-export const columns: ColumnDef<ClientTableItem>[] = [
+export const columns: ColumnDef<Client>[] = [
   {
     accessorKey: "name",
     header: "Client Name",
@@ -60,9 +47,8 @@ export const columns: ColumnDef<ClientTableItem>[] = [
     header: "Account Manager",
     enableSorting: false,
     cell: ({ row }) => {
-      const accountManager = row.getValue(
-        "accountManager"
-      ) as AccountManagerInfo | null;
+      const accountManager: Client["accountManager"] =
+        row.getValue("accountManager");
       return <span>{accountManager?.name || "Unassigned"}</span>;
     },
   },

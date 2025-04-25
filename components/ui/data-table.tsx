@@ -113,6 +113,16 @@ export function DataTable<TData, TValue>({
 
         // Update parent state
         onFilterChange(mappedFilters);
+
+        // Reset to the first page when filters change
+        const newPagination = {
+          ...pagination,
+          pageIndex: 0,
+        };
+        setPagination(newPagination);
+        if (onPaginationChange) {
+          onPaginationChange(newPagination);
+        }
       }
     }, 300),
     [manualFiltering, onFilterChange]

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { useGetBudgetsQuery } from "@/lib/redux/financesApi";
 import { DataTable } from "@/components/ui/data-table";
 import { columns } from "./columns";
@@ -23,8 +23,7 @@ export default function BudgetsPage() {
   // Add filter state to track filters coming from DataTable
   const [filters, setFilters] = useState<{ id: string; value: string }[]>([]);
 
-  // Calculate API page number (1-based) from pageIndex (0-based)
-  const page = pagination.pageIndex + 1;
+  const page = pagination.pageIndex;
   const pageSize = pagination.pageSize;
 
   // Using RTK Query to fetch budgets
@@ -47,6 +46,14 @@ export default function BudgetsPage() {
         ? sorting.map((sort) => `${sort.desc ? "-" : ""}${sort.id}`)
         : ["-startDate"],
   });
+
+  // Handle filter changes from DataTable
+  const handleFilterChange = useCallback(
+    (filters: { id: string; value: string }[]) => {
+      setFilters(filters.filter((f) => f.value !== ""));
+    },
+    []
+  );
 
   // Handle loading state
   if (isLoading) {
@@ -79,12 +86,6 @@ export default function BudgetsPage() {
 
   const budgets = budgetData?.data || [];
   const totalPages = budgetData?.pageCount || 1;
-
-  // Handle filter changes from DataTable
-  function handleFilterChange(filters: { id: string; value: string }[]) {
-    setFilters(filters.filter((f) => f.value !== ""));
-    setPagination((prev) => ({ ...prev, pageIndex: 0 })); // Reset to first page when filtering
-  }
 
   return (
     <div className="space-y-6">

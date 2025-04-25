@@ -7,24 +7,7 @@ import {
   users,
   transactions,
 } from "@/lib/db/schema";
-import {
-  count,
-  eq,
-  and,
-  not,
-  asc,
-  desc,
-  like,
-  sum,
-  between,
-  isNotNull,
-  isNull,
-  gt,
-  lt,
-  gte,
-  lte,
-  or,
-} from "drizzle-orm";
+import { count, eq, and, asc, desc, like, gte, lte, or } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { sql } from "drizzle-orm";
 import { headers } from "next/headers";
@@ -48,7 +31,7 @@ export async function GET(req: NextRequest) {
     const dateFrom = searchParams.get("dateFrom");
     const dateTo = searchParams.get("dateTo");
 
-    const offset = (page - 1) * pageSize;
+    const offset = page * pageSize;
 
     // Build where conditions
     let whereConditions = [eq(budgets.isDeleted, false)];

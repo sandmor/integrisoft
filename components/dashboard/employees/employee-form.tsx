@@ -43,7 +43,7 @@ import { EmployeeWithDetails } from "@/lib/types/employees";
 
 // Base validation schema for employee form (without password validation)
 const baseEmployeeSchema = z.object({
-  name: z.string().min(2, {
+  firstName: z.string().min(2, {
     message: "First name must be at least 2 characters.",
   }),
   lastName: z.string().min(2, {
@@ -97,7 +97,7 @@ const editEmployeeSchema = baseEmployeeSchema.refine(
 // Schema for new employees - required password
 const newEmployeeSchema = z
   .object({
-    name: z.string().min(2, {
+    firstName: z.string().min(2, {
       message: "First name must be at least 2 characters.",
     }),
     lastName: z.string().min(2, {
@@ -246,7 +246,7 @@ export function EmployeeForm({
 
   // Set default values based on provided data or empty form
   const defaultValues: Partial<EmployeeFormValues> = {
-    name: initialData?.firstName || "",
+    firstName: initialData?.firstName || "",
     lastName: initialData?.lastName || "",
     email: initialData?.email || "",
     departmentId: initialDepartmentId || "",
@@ -326,7 +326,7 @@ export function EmployeeForm({
 
       // Convert form data to expected format
       const employeeData = {
-        name: data.name,
+        firstName: data.firstName,
         lastName: data.lastName,
         email: data.email,
         department: selectedDepartment?.name,
@@ -377,17 +377,17 @@ export function EmployeeForm({
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label htmlFor="name" className="text-sm font-medium">
+              <label htmlFor="firstName" className="text-sm font-medium">
                 First Name
               </label>
               <Input
-                id="name"
+                id="fistName"
                 placeholder="First name"
-                {...form.register("name")}
+                {...form.register("firstName")}
               />
-              {form.formState.errors.name && (
+              {form.formState.errors.firstName && (
                 <p className="text-sm text-red-500">
-                  {form.formState.errors.name.message}
+                  {form.formState.errors.firstName.message}
                 </p>
               )}
             </div>

@@ -32,11 +32,14 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  TooltipProps,
 } from "recharts";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from "@/components/ui/chart";
 
 interface BudgetCategory {
   id: string;
@@ -65,30 +68,6 @@ interface MultiYearBudgetPlanningProps {
   onSaveYearlyBudget: (yearlyBudget: YearlyBudget) => Promise<void>;
   onExportData: (format: "csv" | "excel" | "pdf") => Promise<void>;
 }
-
-const CustomTooltip = ({
-  active,
-  payload,
-  label,
-}: TooltipProps<number, string>) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-background border rounded-md p-2 shadow-sm">
-        <p className="font-medium text-sm">{label}</p>
-        {payload.map((entry, index) => (
-          <p
-            key={`item-${index}`}
-            style={{ color: entry.color }}
-            className="text-sm"
-          >
-            {entry.name}: {formatCurrency(entry.value as number)}
-          </p>
-        ))}
-      </div>
-    );
-  }
-  return null;
-};
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("en-US", {
@@ -498,7 +477,14 @@ export function MultiYearBudgetPlanning({
                 Budget Comparison Across Years
               </h3>
               <div className="h-80 w-full">
-                <ResponsiveContainer width="100%" height="100%">
+                <ChartContainer
+                  config={{
+                    Budget: { label: "Budget", color: "#1e40af" },
+                    Actual: { label: "Actual", color: "#15803d" },
+                    Projected: { label: "Projected", color: "#f59e0b" },
+                  }}
+                  className="w-full h-full"
+                >
                   <BarChart
                     data={yearlyTotalsData}
                     margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
@@ -508,13 +494,13 @@ export function MultiYearBudgetPlanning({
                     <YAxis
                       tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
                     />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend />
-                    <Bar dataKey="Budget" fill="#1e40af" />
-                    <Bar dataKey="Actual" fill="#15803d" />
-                    <Bar dataKey="Projected" fill="#f59e0b" />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <ChartLegend content={<ChartLegendContent />} />
+                    <Bar dataKey="Budget" fill="var(--color-Budget)" />
+                    <Bar dataKey="Actual" fill="var(--color-Actual)" />
+                    <Bar dataKey="Projected" fill="var(--color-Projected)" />
                   </BarChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               </div>
             </div>
           </TabsContent>
@@ -523,7 +509,18 @@ export function MultiYearBudgetPlanning({
             <div className="space-y-6">
               <h3 className="text-lg font-medium">Budget Category Trends</h3>
               <div className="h-80 w-full">
-                <ResponsiveContainer width="100%" height="100%">
+                <ChartContainer
+                  config={Object.fromEntries(
+                    yearlyBudgets.map((yb, idx) => [
+                      yb.year.toString(),
+                      {
+                        label: yb.year.toString(),
+                        color: colorScheme[idx % colorScheme.length],
+                      },
+                    ])
+                  )}
+                  className="w-full h-full"
+                >
                   <LineChart
                     data={categoryTrendsData}
                     margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
@@ -533,19 +530,19 @@ export function MultiYearBudgetPlanning({
                     <YAxis
                       tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
                     />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <ChartLegend content={<ChartLegendContent />} />
                     {yearlyBudgets.map((yearBudget, index) => (
                       <Line
                         key={yearBudget.year}
                         type="monotone"
                         dataKey={yearBudget.year.toString()}
-                        stroke={colorScheme[index % colorScheme.length]}
+                        stroke="var(--color-${yearBudget.year})"
                         activeDot={{ r: 8 }}
                       />
                     ))}
                   </LineChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               </div>
             </div>
           </TabsContent>

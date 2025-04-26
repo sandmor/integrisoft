@@ -30,18 +30,21 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  TooltipProps,
 } from "recharts";
 import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from "@/components/ui/chart";
+import { Progress } from "@/components/ui/progress";
+import {
   Tooltip as UITooltip,
-  TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  TooltipContent,
 } from "@/components/ui/tooltip";
-import { Progress } from "@/components/ui/progress";
 
 // Interfaces
 interface FinancialKPI {
@@ -76,32 +79,6 @@ interface FinancialKPIsProps {
   onExportKPIs: (format: "csv" | "pdf" | "excel") => void;
   onTimeRangeChange: (timeRangeId: string) => void;
 }
-
-// Custom tooltip for charts
-const CustomTooltip = ({
-  active,
-  payload,
-  label,
-}: TooltipProps<number, string>) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-background border rounded-md p-2 shadow-sm">
-        <p className="font-medium text-sm">{label}</p>
-        {payload.map((entry, index) => (
-          <p
-            key={`tooltip-item-${index}`}
-            style={{ color: entry.color }}
-            className="text-sm"
-          >
-            {entry.name}:{" "}
-            {formatValue(entry.value as number, (entry.unit as string) || "$")}
-          </p>
-        ))}
-      </div>
-    );
-  }
-  return null;
-};
 
 const formatValue = (value: number, unit: string) => {
   if (unit === "$") {
@@ -373,17 +350,22 @@ export function FinancialKPIs({
                       </div>
 
                       <div className="mt-4 h-16">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ChartContainer
+                          config={{
+                            value: { label: kpi.name, color: statusColor },
+                          }}
+                          className="w-full h-full"
+                        >
                           <LineChart data={kpi.trend}>
                             <Line
                               type="monotone"
                               dataKey="value"
-                              stroke={statusColor}
+                              stroke="var(--color-value)"
                               strokeWidth={2}
                               dot={false}
                             />
                           </LineChart>
-                        </ResponsiveContainer>
+                        </ChartContainer>
                       </div>
                     </CardContent>
                   </Card>
@@ -403,44 +385,33 @@ export function FinancialKPIs({
                   </CardHeader>
                   <CardContent>
                     <div className="h-72 w-full">
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ChartContainer
+                        config={{
+                          value: {
+                            label: kpi.name,
+                            color: getStatusColor(kpi.status),
+                          },
+                        }}
+                        className="w-full h-full"
+                      >
                         <AreaChart
                           data={kpi.trend}
                           margin={{ top: 10, right: 30, left: 0, bottom: 5 }}
                         >
-                          <defs>
-                            <linearGradient
-                              id={`color-${kpi.id}`}
-                              x1="0"
-                              y1="0"
-                              x2="0"
-                              y2="1"
-                            >
-                              <stop
-                                offset="5%"
-                                stopColor={getStatusColor(kpi.status)}
-                                stopOpacity={0.8}
-                              />
-                              <stop
-                                offset="95%"
-                                stopColor={getStatusColor(kpi.status)}
-                                stopOpacity={0.2}
-                              />
-                            </linearGradient>
-                          </defs>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis dataKey="date" />
                           <YAxis />
-                          <Tooltip content={<CustomTooltip />} />
+                          <ChartTooltip content={<ChartTooltipContent />} />
+                          <ChartLegend content={<ChartLegendContent />} />
                           <Area
                             type="monotone"
                             dataKey="value"
-                            stroke={getStatusColor(kpi.status)}
-                            fillOpacity={1}
-                            fill={`url(#color-${kpi.id})`}
+                            stroke="var(--color-value)"
+                            fill="var(--color-value)"
+                            fillOpacity={0.3}
                           />
                         </AreaChart>
-                      </ResponsiveContainer>
+                      </ChartContainer>
                     </div>
                   </CardContent>
                 </Card>
@@ -456,14 +427,21 @@ export function FinancialKPIs({
               </CardHeader>
               <CardContent>
                 <div className="h-80 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+                  <ChartContainer
+                    config={{
+                      "Current Value": {
+                        label: "Current Value",
+                        color: "#1e40af",
+                      },
+                      Target: { label: "Target", color: "#64748b" },
+                    }}
+                    className="w-full h-full"
+                  >
                     <BarChart
                       data={category.kpis.map((kpi) => ({
                         name: kpi.name,
                         "Current Value": kpi.value,
                         Target: kpi.target,
-                        unit: kpi.unit,
-                        status: kpi.status,
                       }))}
                       layout="vertical"
                       margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
@@ -476,9 +454,13 @@ export function FinancialKPIs({
                         tick={{ fontSize: 12 }}
                         width={150}
                       />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Legend />
-                      <Bar dataKey="Current Value" fill="#1e40af" unit="$">
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <ChartLegend content={<ChartLegendContent />} />
+                      <Bar
+                        dataKey="Current Value"
+                        fill="var(--color-Current Value)"
+                        unit="$"
+                      >
                         {category.kpis.map((kpi, index) => (
                           <Cell
                             key={`cell-${index}`}
@@ -486,9 +468,13 @@ export function FinancialKPIs({
                           />
                         ))}
                       </Bar>
-                      <Bar dataKey="Target" fill="#64748b" unit="$" />
+                      <Bar
+                        dataKey="Target"
+                        fill="var(--color-Target)"
+                        unit="$"
+                      />
                     </BarChart>
-                  </ResponsiveContainer>
+                  </ChartContainer>
                 </div>
               </CardContent>
             </Card>

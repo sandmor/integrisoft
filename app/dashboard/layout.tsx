@@ -25,22 +25,19 @@ export default async function DashboardLayout({
     headersList.get("x-invoke-path") ||
     "/dashboard";
 
-  // Extract entity ID from pathname for entity detail pages
-  let entityTitle = undefined;
+  // Server-side map of entity IDs to names for breadcrumb
+  const initialEntityNameMap: Record<string, string> = {};
   if (pathname) {
     const segments = pathname.split("/").filter(Boolean);
-    // Look for ID pattern in segments
     for (let i = 1; i < segments.length; i++) {
       const segment = segments[i];
       if (segment.match(/^[A-Za-z0-9]{20,}$/)) {
         const entityType = segments[i - 1];
         if (entityType) {
-          // Try to fetch entity name on the server to pass to client
           const entityInfo = await getEntityNameById(entityType, segment);
-          if (entityInfo) {
-            entityTitle = entityInfo;
+          if (entityInfo?.name) {
+            initialEntityNameMap[segment] = entityInfo.name;
           }
-          break;
         }
       }
     }
@@ -67,7 +64,7 @@ export default async function DashboardLayout({
 
           {/* Breadcrumb - client component with server-provided data */}
           <div className="px-6 pt-4">
-            <DashboardBreadcrumb entityTitle={entityTitle} />
+            <DashboardBreadcrumb initialEntityNameMap={initialEntityNameMap} />
           </div>
 
           {/* Page content */}

@@ -8,15 +8,12 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid } from "recharts";
 import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
 import { ArrowDownNarrowWide, ArrowUpNarrowWide, Minus } from "lucide-react";
 
 type DeltaType = "increase" | "decrease" | "unchanged";
@@ -166,24 +163,12 @@ export function BudgetRevisionHistory({
         {sortedRevisions.length > 0 ? (
           <>
             <div className="mb-6">
-              <ResponsiveContainer width="100%" height={130}>
+              <ChartContainer
+                config={{ Amount: { label: "Amount", color: "#3b82f6" } }}
+                className="w-full h-[130px]"
+              >
                 <AreaChart data={chartData}>
-                  <defs>
-                    <linearGradient
-                      id="colorAmount"
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                      <stop
-                        offset="95%"
-                        stopColor="#3b82f6"
-                        stopOpacity={0.1}
-                      />
-                    </linearGradient>
-                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" />
                   <XAxis
                     dataKey="date"
                     tick={{ fontSize: 10 }}
@@ -191,16 +176,16 @@ export function BudgetRevisionHistory({
                     tickLine={false}
                   />
                   <YAxis hide domain={["auto", "auto"]} />
-                  <Tooltip content={<CustomTooltip />} />
+                  <ChartTooltip content={<CustomTooltip />} />
                   <Area
                     type="monotone"
                     dataKey="Amount"
-                    stroke="#3b82f6"
-                    fillOpacity={1}
-                    fill="url(#colorAmount)"
+                    stroke="var(--color-Amount)"
+                    fill="var(--color-Amount)"
+                    fillOpacity={0.3}
                   />
                 </AreaChart>
-              </ResponsiveContainer>
+              </ChartContainer>
             </div>
 
             <Accordion type="single" collapsible className="w-full">

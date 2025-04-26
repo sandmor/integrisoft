@@ -33,14 +33,17 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
-  TooltipProps,
 } from "recharts";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from "@/components/ui/chart";
 import { Download, Filter, SortAsc, SortDesc } from "lucide-react";
 
 interface Department {
@@ -229,31 +232,6 @@ export function DepartmentCostAnalysis({
       "Cost Per Employee": cost?.costPerEmployee || 0,
     };
   });
-
-  // Custom tooltip component for Recharts
-  const CustomTooltip = ({
-    active,
-    payload,
-    label,
-  }: TooltipProps<number, string>) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-background border rounded-md p-2 shadow-sm">
-          <p className="font-medium text-sm">{label}</p>
-          {payload.map((entry, index) => (
-            <p
-              key={`item-${index}`}
-              style={{ color: entry.color }}
-              className="text-sm"
-            >
-              {entry.name}: {formatCurrency(entry.value as number)}
-            </p>
-          ))}
-        </div>
-      );
-    }
-    return null;
-  };
 
   // COLORS for charts
   const CHART_COLORS = [
@@ -581,7 +559,10 @@ export function DepartmentCostAnalysis({
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="h-80">
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ChartContainer
+                        config={{ value: { label: "Value", color: "#8884d8" } }}
+                        className="w-full h-full"
+                      >
                         <PieChart>
                           <Pie
                             data={costBreakdownData}
@@ -589,7 +570,6 @@ export function DepartmentCostAnalysis({
                             cy="50%"
                             labelLine={false}
                             outerRadius={80}
-                            fill="#8884d8"
                             dataKey="value"
                             nameKey="name"
                             label={({ name, percent }) =>
@@ -603,10 +583,10 @@ export function DepartmentCostAnalysis({
                               />
                             ))}
                           </Pie>
-                          <Tooltip content={<CustomTooltip />} />
-                          <Legend />
+                          <ChartTooltip content={<ChartTooltipContent />} />
+                          <ChartLegend content={<ChartLegendContent />} />
                         </PieChart>
-                      </ResponsiveContainer>
+                      </ChartContainer>
                     </CardContent>
                   </Card>
 
@@ -617,15 +597,18 @@ export function DepartmentCostAnalysis({
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="h-80">
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ChartContainer
+                        config={{
+                          "Cost Per Employee": {
+                            label: "Cost Per Employee",
+                            color: "#1f77b4",
+                          },
+                        }}
+                        className="w-full h-full"
+                      >
                         <BarChart
                           data={efficiencyData}
-                          margin={{
-                            top: 10,
-                            right: 30,
-                            left: 40,
-                            bottom: 40,
-                          }}
+                          margin={{ top: 10, right: 30, left: 40, bottom: 40 }}
                         >
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
@@ -640,14 +623,15 @@ export function DepartmentCostAnalysis({
                               `$${(value / 1000).toFixed(0)}k`
                             }
                           />
-                          <Tooltip content={<CustomTooltip />} />
+                          <ChartTooltip content={<ChartTooltipContent />} />
+                          <ChartLegend content={<ChartLegendContent />} />
                           <Bar
                             dataKey="Cost Per Employee"
-                            fill="#1f77b4"
+                            fill="var(--color-Cost Per Employee)"
                             animationDuration={1000}
                           />
                         </BarChart>
-                      </ResponsiveContainer>
+                      </ChartContainer>
                     </CardContent>
                   </Card>
                 </div>
@@ -709,7 +693,12 @@ export function DepartmentCostAnalysis({
                       </div>
 
                       <div className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ChartContainer
+                          config={{
+                            amount: { label: "Amount", color: "#8884d8" },
+                          }}
+                          className="w-full h-full"
+                        >
                           <PieChart>
                             <Pie
                               data={categoryData}
@@ -717,7 +706,6 @@ export function DepartmentCostAnalysis({
                               cy="50%"
                               labelLine={false}
                               outerRadius={80}
-                              fill="#8884d8"
                               dataKey="amount"
                               nameKey="name"
                               label={({ name, percent }) =>
@@ -733,10 +721,10 @@ export function DepartmentCostAnalysis({
                                 />
                               ))}
                             </Pie>
-                            <Tooltip content={<CustomTooltip />} />
-                            <Legend />
+                            <ChartTooltip content={<ChartTooltipContent />} />
+                            <ChartLegend content={<ChartLegendContent />} />
                           </PieChart>
-                        </ResponsiveContainer>
+                        </ChartContainer>
                       </div>
                     </div>
                   </CardContent>
@@ -751,15 +739,16 @@ export function DepartmentCostAnalysis({
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ChartContainer
+                      config={{
+                        planned: { label: "Budget", color: "#1f77b4" },
+                        actual: { label: "Actual", color: "#ff7f0e" },
+                      }}
+                      className="w-full h-full"
+                    >
                       <LineChart
                         data={trendData}
-                        margin={{
-                          top: 10,
-                          right: 30,
-                          left: 20,
-                          bottom: 5,
-                        }}
+                        margin={{ top: 10, right: 30, left: 20, bottom: 5 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="month" />
@@ -768,12 +757,12 @@ export function DepartmentCostAnalysis({
                             `$${(value / 1000).toFixed(0)}k`
                           }
                         />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Legend />
+                        <ChartTooltip content={<ChartTooltipContent />} />
+                        <ChartLegend content={<ChartLegendContent />} />
                         <Line
                           type="monotone"
                           dataKey="planned"
-                          stroke="#1f77b4"
+                          stroke="var(--color-planned)"
                           activeDot={{ r: 8 }}
                           strokeWidth={2}
                           name="Budget"
@@ -782,13 +771,13 @@ export function DepartmentCostAnalysis({
                         <Line
                           type="monotone"
                           dataKey="actual"
-                          stroke="#ff7f0e"
+                          stroke="var(--color-actual)"
                           strokeWidth={2}
                           name="Actual"
                           animationDuration={1000}
                         />
                       </LineChart>
-                    </ResponsiveContainer>
+                    </ChartContainer>
                   </CardContent>
                 </Card>
               </TabsContent>

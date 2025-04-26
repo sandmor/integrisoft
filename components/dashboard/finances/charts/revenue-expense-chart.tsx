@@ -1,14 +1,12 @@
 import React from "react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from "@/components/ui/chart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type DataPoint = {
@@ -36,28 +34,37 @@ export function RevenueExpenseChart({
         <CardTitle>{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={height}>
+        <ChartContainer
+          config={{
+            revenue: { label: "Revenue", color: "#10b981" },
+            expenses: { label: "Expenses", color: "#ef4444" },
+          }}
+          className={`w-full h-[${height}px]`}
+        >
           <BarChart
             data={data}
-            margin={{
-              top: 5,
-              right: 30,
-              left: 20,
-              bottom: 5,
-            }}
+            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="name" />
             <YAxis />
-            <Tooltip
-              formatter={(value) => [`$${value.toLocaleString()}`, undefined]}
+            <ChartTooltip
+              formatter={(value) => [
+                `$${(value as number).toLocaleString()}`,
+                undefined,
+              ]}
               labelFormatter={(label) => `Period: ${label}`}
+              content={<ChartTooltipContent />}
             />
-            <Legend />
-            <Bar dataKey="revenue" name="Revenue" fill="#10b981" />
-            <Bar dataKey="expenses" name="Expenses" fill="#ef4444" />
+            <ChartLegend content={<ChartLegendContent />} />
+            <Bar dataKey="revenue" name="Revenue" fill="var(--color-revenue)" />
+            <Bar
+              dataKey="expenses"
+              name="Expenses"
+              fill="var(--color-expenses)"
+            />
           </BarChart>
-        </ResponsiveContainer>
+        </ChartContainer>
       </CardContent>
     </Card>
   );

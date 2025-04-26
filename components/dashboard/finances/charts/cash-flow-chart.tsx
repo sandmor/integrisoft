@@ -7,10 +7,14 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
 } from "recharts";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from "@/components/ui/chart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type DataPoint = {
@@ -39,66 +43,62 @@ export function CashFlowChart({
         <CardTitle>{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={height}>
+        <ChartContainer
+          config={{ amount: { label: "Amount", color: "#8884d8" } }}
+          className={`w-full h-[${height}px]`}
+        >
           {showArea ? (
             <AreaChart
               data={data}
-              margin={{
-                top: 5,
-                right: 30,
-                left: 20,
-                bottom: 5,
-              }}
+              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
             >
-              <defs>
-                <linearGradient id="colorAmount" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8} />
-                  <stop offset="95%" stopColor="#8884d8" stopOpacity={0} />
-                </linearGradient>
-              </defs>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="date" />
               <YAxis />
-              <Tooltip
-                formatter={(value) => [`$${value.toLocaleString()}`, "Amount"]}
+              <ChartTooltip
+                formatter={(value) => [
+                  `$${(value as number).toLocaleString()}`,
+                  undefined,
+                ]}
                 labelFormatter={(label) => `Date: ${label}`}
+                content={<ChartTooltipContent />}
               />
-              <Legend />
+              <ChartLegend content={<ChartLegendContent />} />
               <Area
                 type="monotone"
                 dataKey="amount"
-                stroke="#8884d8"
-                fillOpacity={1}
-                fill="url(#colorAmount)"
+                stroke="var(--color-amount)"
+                fill="var(--color-amount)"
+                fillOpacity={0.3}
               />
             </AreaChart>
           ) : (
             <LineChart
               data={data}
-              margin={{
-                top: 5,
-                right: 30,
-                left: 20,
-                bottom: 5,
-              }}
+              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
             >
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="date" />
               <YAxis />
-              <Tooltip
-                formatter={(value) => [`$${value.toLocaleString()}`, "Amount"]}
+              <ChartTooltip
+                formatter={(value) => [
+                  `$${(value as number).toLocaleString()}`,
+                  undefined,
+                ]}
                 labelFormatter={(label) => `Date: ${label}`}
+                content={<ChartTooltipContent />}
               />
-              <Legend />
+              <ChartLegend content={<ChartLegendContent />} />
               <Line
                 type="monotone"
                 dataKey="amount"
-                stroke="#8884d8"
+                stroke="var(--color-amount)"
+                strokeWidth={2}
                 activeDot={{ r: 8 }}
               />
             </LineChart>
           )}
-        </ResponsiveContainer>
+        </ChartContainer>
       </CardContent>
     </Card>
   );

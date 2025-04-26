@@ -23,16 +23,19 @@ import {
   PieChart,
   Pie,
   Cell,
-  ResponsiveContainer,
   LineChart,
   Line,
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
-  Legend,
-  TooltipProps,
 } from "recharts";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+} from "@/components/ui/chart";
 import { CalendarIcon, Download } from "lucide-react";
 import { useState } from "react";
 
@@ -75,31 +78,6 @@ interface CostCenterMetricsProps {
   onExportData: (costCenterId: string, format: "csv" | "pdf" | "excel") => void;
   onDateRangeChange: (range: string) => void;
 }
-
-// Custom tooltip for charts
-const CustomTooltip = ({
-  active,
-  payload,
-  label,
-}: TooltipProps<number, string>) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-background border rounded-md p-2 shadow-sm">
-        <p className="font-medium text-sm">{label}</p>
-        {payload.map((entry, index) => (
-          <p
-            key={`tooltip-item-${index}`}
-            style={{ color: entry.color }}
-            className="text-sm"
-          >
-            {entry.name}: {formatCurrency(entry.value as number)}
-          </p>
-        ))}
-      </div>
-    );
-  }
-  return null;
-};
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat("en-US", {
@@ -389,62 +367,40 @@ export function CostCenterMetrics({
           </CardHeader>
           <CardContent>
             <div className="h-72 w-full">
-              <ResponsiveContainer width="100%" height="100%">
+              <ChartContainer
+                config={{
+                  budget: { label: "Budget", color: "#3b82f6" },
+                  spent: { label: "Spent", color: "#f59e0b" },
+                }}
+                className="w-full h-full"
+              >
                 <AreaChart
                   data={selectedMetrics.trend}
                   margin={{ top: 10, right: 30, left: 0, bottom: 5 }}
                 >
-                  <defs>
-                    <linearGradient
-                      id="colorBudget"
-                      x1="0"
-                      y1="0"
-                      x2="0"
-                      y2="1"
-                    >
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                      <stop
-                        offset="95%"
-                        stopColor="#3b82f6"
-                        stopOpacity={0.2}
-                      />
-                    </linearGradient>
-                    <linearGradient id="colorSpent" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.8} />
-                      <stop
-                        offset="95%"
-                        stopColor="#f59e0b"
-                        stopOpacity={0.2}
-                      />
-                    </linearGradient>
-                  </defs>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" />
                   <YAxis
-                    tickFormatter={(value) =>
-                      `${value > 0 ? "$" + value.toLocaleString() : ""}`
-                    }
+                    tickFormatter={(value) => `$${value.toLocaleString()}`}
                   />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <ChartLegend content={<ChartLegendContent />} />
                   <Area
                     type="monotone"
                     dataKey="budget"
-                    stroke="#3b82f6"
-                    fillOpacity={1}
-                    fill="url(#colorBudget)"
-                    name="Budget"
+                    stroke="var(--color-budget)"
+                    fill="var(--color-budget)"
+                    fillOpacity={0.3}
                   />
                   <Area
                     type="monotone"
                     dataKey="spent"
-                    stroke="#f59e0b"
-                    fillOpacity={1}
-                    fill="url(#colorSpent)"
-                    name="Spent"
+                    stroke="var(--color-spent)"
+                    fill="var(--color-spent)"
+                    fillOpacity={0.3}
                   />
                 </AreaChart>
-              </ResponsiveContainer>
+              </ChartContainer>
             </div>
           </CardContent>
         </Card>
@@ -456,7 +412,10 @@ export function CostCenterMetrics({
           </CardHeader>
           <CardContent className="flex items-center justify-center">
             <div className="h-72 w-full">
-              <ResponsiveContainer width="100%" height="100%">
+              <ChartContainer
+                config={{ amount: { label: "Amount", color: "#8884d8" } }}
+                className="w-full h-full"
+              >
                 <PieChart>
                   <Pie
                     data={spendingData}
@@ -464,8 +423,6 @@ export function CostCenterMetrics({
                     cy="50%"
                     innerRadius={70}
                     outerRadius={100}
-                    fill="#8884d8"
-                    paddingAngle={2}
                     dataKey="amount"
                     label={({ name, percent }) =>
                       `${name}: ${(percent * 100).toFixed(0)}%`
@@ -478,44 +435,56 @@ export function CostCenterMetrics({
                       />
                     ))}
                   </Pie>
-                  <Tooltip
+                  <ChartTooltip
                     formatter={(value) => formatCurrency(value as number)}
+                    content={<ChartTooltipContent />}
                   />
+                  <ChartLegend content={<ChartLegendContent />} />
                 </PieChart>
-              </ResponsiveContainer>
+              </ChartContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Subcategory Breakdown</CardTitle>
+            <CardDescription>Budget vs. actual by subcategory</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-80 w-full">
+              <ChartContainer
+                config={{
+                  budget: { label: "Budget", color: "#3b82f6" },
+                  spent: { label: "Spent", color: "#f59e0b" },
+                }}
+                className="w-full h-full"
+              >
+                <BarChart
+                  data={selectedMetrics.subcategories}
+                  layout="vertical"
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis
+                    type="number"
+                    tickFormatter={(value) => formatCurrency(value)}
+                  />
+                  <YAxis type="category" dataKey="name" width={150} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <ChartLegend content={<ChartLegendContent />} />
+                  <Bar
+                    dataKey="budget"
+                    name="Budget"
+                    fill="var(--color-budget)"
+                  />
+                  <Bar dataKey="spent" name="Spent" fill="var(--color-spent)" />
+                </BarChart>
+              </ChartContainer>
             </div>
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Subcategory Breakdown</CardTitle>
-          <CardDescription>Budget vs. actual by subcategory</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={selectedMetrics.subcategories}
-                layout="vertical"
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                <XAxis
-                  type="number"
-                  tickFormatter={(value) => formatCurrency(value)}
-                />
-                <YAxis type="category" dataKey="name" width={150} />
-                <Tooltip content={<CustomTooltip />} />
-                <Legend />
-                <Bar dataKey="budget" name="Budget" fill="#3b82f6" />
-                <Bar dataKey="spent" name="Spent" fill="#f59e0b" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

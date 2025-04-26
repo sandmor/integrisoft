@@ -9,6 +9,13 @@ export const api = createApi({
   }),
   refetchOnFocus: true,
   refetchOnReconnect: true,
-  tagTypes: ["Clients", "Projects", "Employees", "Products", "Finances"],
+  tagTypes: [
+    "Clients",
+    "Projects",
+    "Employees",
+    "Products",
+    "Finances",
+    "ProductVersions",
+  ],
   endpoints: () => ({}),
 });

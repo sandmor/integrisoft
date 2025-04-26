@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { dashboardModules } from "@/lib/dashboard-config";
 import React from "react";
+import { toast } from "sonner";
 import { getEntityNameById } from "@/lib/actions/dashboard";
 
 // Type for entity information
@@ -30,7 +31,7 @@ type BreadcrumbItemType = {
 };
 
 interface DashboardBreadcrumbProps {
-  entityTitle?: EntityInfo;
+  initialEntityNameMap: Record<string, string>;
 }
 
 /**
@@ -39,18 +40,25 @@ interface DashboardBreadcrumbProps {
  */
 function buildBreadcrumbItems(
   pathname: string,
-  entityInfo: EntityInfo | null
+  entityInfoMap: Record<string, string>
 ): {
   items: BreadcrumbItemType[];
-  entitySegmentToFetch: { index: number; segment: string; type: string } | null;
+  entitySegmentsToFetch: Array<{
+    index: number;
+    segment: string;
+    type: string;
+  }>;
 } {
   // Default values
-  let shouldHide = false;
-  let entitySegmentToFetch = null;
+  const entitySegmentsToFetch: Array<{
+    index: number;
+    segment: string;
+    type: string;
+  }> = [];
 
   // Skip for the main dashboard page
   if (pathname === "/dashboard") {
-    return { items: [], entitySegmentToFetch: null };
+    return { items: [], entitySegmentsToFetch: [] };
   }
 
   const segments = pathname.split("/").filter(Boolean);
@@ -95,28 +103,14 @@ function buildBreadcrumbItems(
     }
     // Handle UUIDs or IDs (most likely detail pages)
     else if (segment.match(/^[A-Za-z0-9]{20,}$/)) {
-      // Check if we already have entity info for this ID
-      if (entityInfo && entityInfo.id === segment) {
-        displayName = entityInfo.name;
+      const savedName = entityInfoMap[segment];
+      if (savedName) {
+        displayName = savedName;
       } else {
-        // For client-side rendering, we'll fetch the entity name
         isLoading = true;
-        shouldHide = true;
         displayName = "Loading...";
-
-        // Get the entity type from the previous segment
-        const entityType = segments[index - 1];
-        if (entityType) {
-          // Store info to fetch later in useEffect
-          entitySegmentToFetch = {
-            index,
-            segment,
-            type: entityType,
-          };
-        } else {
-          displayName = "Details";
-          isLoading = false;
-        }
+        const entityType = segments[index - 1] || "";
+        entitySegmentsToFetch.push({ index, segment, type: entityType });
       }
     }
 
@@ -128,84 +122,62 @@ function buildBreadcrumbItems(
     });
   }
 
-  return {
-    items: breadcrumbItems,
-    entitySegmentToFetch,
-  };
+  return { items: breadcrumbItems, entitySegmentsToFetch };
 }
 
-export function DashboardBreadcrumb({ entityTitle }: DashboardBreadcrumbProps) {
-  // Use client-side pathname for navigation tracking
-  const clientPathname = usePathname();
-  // Use provided pathname or client pathname
-  const pathname = clientPathname || "/dashboard";
-
-  // Initialize breadcrumb items with server-provided information
-  const initialBreadcrumbData = buildBreadcrumbItems(
-    pathname,
-    entityTitle || null
-  );
-
-  // State to track breadcrumb items
+export function DashboardBreadcrumb({
+  initialEntityNameMap,
+}: DashboardBreadcrumbProps) {
+  const pathname = usePathname() || "/dashboard";
   const [breadcrumbItems, setBreadcrumbItems] = useState<BreadcrumbItemType[]>(
-    initialBreadcrumbData.items
+    () => {
+      const { items } = buildBreadcrumbItems(pathname, initialEntityNameMap);
+      return items;
+    }
   );
+  const [entityNameMap, setEntityNameMap] =
+    useState<Record<string, string>>(initialEntityNameMap);
 
-  // State to track last entity information to avoid duplicate fetches
-  const [lastEntityInfo, setLastEntityInfo] = useState<EntityInfo | null>(
-    entityTitle || null
-  );
-
-  // Build breadcrumb items when pathname or entity info changes
   useEffect(() => {
-    const { items, entitySegmentToFetch } = buildBreadcrumbItems(
+    const { items, entitySegmentsToFetch } = buildBreadcrumbItems(
       pathname,
-      lastEntityInfo
+      entityNameMap
     );
+    setBreadcrumbItems(items);
 
-    // If we need to fetch an entity name
-    if (entitySegmentToFetch) {
-      const { segment, type, index } = entitySegmentToFetch;
-
-      // Set items immediately, even with loading state
-      setBreadcrumbItems(items);
-
-      // Fetch entity name
-      getEntityNameById(type, segment).then((result) => {
-        if (result) {
-          // Update the breadcrumb item with the fetched name
-          setBreadcrumbItems((prevItems) => {
-            const newItems = [...prevItems];
-            // Find the loading item
-            const path = `/${pathname
-              .split("/")
-              .filter(Boolean)
-              .slice(0, index + 1)
-              .join("/")}`;
-            const itemIndex = newItems.findIndex(
-              (item) => item.href === path && item.isLoading
-            );
-
-            if (itemIndex !== -1) {
-              newItems[itemIndex] = {
-                ...newItems[itemIndex],
-                name: result.name,
-                isLoading: false,
-              };
-            }
-
-            // Save this entity info for future navigation
-            setLastEntityInfo({
-              id: segment,
-              name: result.name,
+    entitySegmentsToFetch.forEach(({ segment, type, index }) => {
+      getEntityNameById(type, segment)
+        .then((result) => {
+          if (result?.name) {
+            setEntityNameMap((prev) => ({ ...prev, [segment]: result.name }));
+            setBreadcrumbItems((prev) => {
+              const newItems = [...prev];
+              const path = `/${pathname
+                .split("/")
+                .filter(Boolean)
+                .slice(0, index + 1)
+                .join("/")}`;
+              const itemIndex = newItems.findIndex(
+                (item) => item.href === path && item.isLoading
+              );
+              if (itemIndex !== -1) {
+                newItems[itemIndex] = {
+                  ...newItems[itemIndex],
+                  name: result.name,
+                  isLoading: false,
+                };
+              }
+              return newItems;
             });
-
-            return newItems;
-          });
-        } else {
-          // If we can't get a name, use a default
-          setBreadcrumbItems((prevItems) => {
-            const newItems = [...prevItems];
+          } else {
+            throw new Error("No name returned");
+          }
+        })
+        .catch((err) => {
+          console.error(err);
+          toast.error(`Failed to load ${type} name`);
+          setBreadcrumbItems((prev) => {
+            const newItems = [...prev];
             const path = `/${pathname
               .split("/")
               .filter(Boolean)
@@ -214,7 +186,6 @@ export function DashboardBreadcrumb({ entityTitle }: DashboardBreadcrumbProps) {
             const itemIndex = newItems.findIndex(
               (item) => item.href === path && item.isLoading
             );
-
             if (itemIndex !== -1) {
               newItems[itemIndex] = {
                 ...newItems[itemIndex],
@@ -222,16 +193,11 @@ export function DashboardBreadcrumb({ entityTitle }: DashboardBreadcrumbProps) {
                 isLoading: false,
               };
             }
-
             return newItems;
           });
-        }
-      });
-    } else {
-      // No entity to fetch, just update items
-      setBreadcrumbItems(items);
-    }
-  }, [pathname, lastEntityInfo]);
+        });
+    });
+  }, [pathname]);
 
   // Skip rendering for the main dashboard page
   if (pathname === "/dashboard" || breadcrumbItems.length === 0) {

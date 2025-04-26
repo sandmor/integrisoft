@@ -361,6 +361,47 @@ export async function getEntityNameById(
       }
     }
 
+    if (type === "products") {
+      const result = await db.query.products.findFirst({
+        where: (products, { eq, and }) =>
+          and(eq(products.id, id), eq(products.isDeleted, false)),
+      });
+
+      if (result) {
+        return {
+          id,
+          name: result.name,
+        };
+      }
+    }
+
+    if (type === "tasks") {
+      const result = await db.query.tasks.findFirst({
+        where: (tasks, { eq, and }) =>
+          and(eq(tasks.id, id), eq(tasks.isDeleted, false)),
+      });
+
+      if (result) {
+        return {
+          id,
+          name: result.title,
+        };
+      }
+    }
+
+    if (type === "milestones") {
+      const result = await db.query.milestones.findFirst({
+        where: (milestones, { eq, and }) =>
+          and(eq(milestones.id, id), eq(milestones.isDeleted, false)),
+      });
+      if (result) {
+        return {
+          id,
+          name: result.name,
+        };
+      }
+    }
+
     return null;
   } catch (error) {
     console.error(`Error fetching ${type} name:`, error);

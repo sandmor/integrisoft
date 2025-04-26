@@ -1,7 +1,13 @@
 import * as schema from "../db/schema";
 import { faker } from "@faker-js/faker";
 import { createId } from "@paralleldrive/cuid2";
-import { db } from "../db";
+import { db } from "../db/index";
+import {
+  contracts,
+  products,
+  serviceLevelAgreements,
+  clients,
+} from "../db/schema";
 import { eq } from "drizzle-orm";
 import {
   TransactionCategoriesResult,
@@ -1111,7 +1117,7 @@ export async function generateTransactions(
 
             // Payment is roughly project budget / payment count, with some variation
             const basePayment = projectBudget / paymentCount;
-            const amount = basePayment * (0.95 + Math.random() * 0.1);
+            const amount = basePayment * (1.1 + Math.random() * 0.2); // Boosted by 10-30%
 
             return {
               date: new Date(
@@ -1139,7 +1145,7 @@ export async function generateTransactions(
             projectMonths[0].getMonth(),
             5 + Math.floor(Math.random() * 10)
           ),
-          amount: projectBudget * (0.3 + Math.random() * 0.1),
+          amount: projectBudget * (0.4 + Math.random() * 0.1), // Boosted to 40-50%
           isInitial: true,
           isFinal: false,
         });
@@ -1157,7 +1163,7 @@ export async function generateTransactions(
                 month.getMonth(),
                 15 + Math.floor(Math.random() * 10)
               ),
-              amount: projectBudget * (0.15 + Math.random() * 0.1), // 15-25% each progress payment
+              amount: projectBudget * (0.2 + Math.random() * 0.1), // Boosted to 20-30%
               isInitial: false,
               isFinal: false,
             });
@@ -1172,7 +1178,7 @@ export async function generateTransactions(
               projectMonths[0].getMonth(),
               5 + Math.floor(Math.random() * 10)
             ),
-            amount: projectBudget * (0.1 + Math.random() * 0.1), // 10-20% initial payment
+            amount: projectBudget * (0.15 + Math.random() * 0.1), // Boosted to 15-25%
             isInitial: true,
             isFinal: false,
           });
@@ -1350,6 +1356,230 @@ export async function generateTransactions(
         softwareCat.id,
         softwareCostCenter.id,
         null
+      );
+    }
+  }
+
+  // Additional revenue streams
+  const additionalRevenueStreams = [
+    {
+      name: "Consulting Fees",
+      probability: 0.3,
+      minAmount: 5000,
+      maxAmount: 20000,
+    },
+    {
+      name: "Training Sessions",
+      probability: 0.2,
+      minAmount: 3000,
+      maxAmount: 15000,
+    },
+    {
+      name: "Licensing Fees",
+      probability: 0.1,
+      minAmount: 10000,
+      maxAmount: 50000,
+    },
+  ];
+
+  // Generate additional revenue transactions
+  for (const month of eachMonthOfInterval({ start: startDate, end: endDate })) {
+    for (const stream of additionalRevenueStreams) {
+      if (Math.random() < stream.probability) {
+        const amount =
+          stream.minAmount +
+          Math.random() * (stream.maxAmount - stream.minAmount);
+        await createTransaction(
+          "income",
+          new Date(
+            month.getFullYear(),
+            month.getMonth(),
+            10 + Math.floor(Math.random() * 10)
+          ),
+          amount,
+          `${stream.name} for ${format(month, "MMMM yyyy")}`,
+          clientPaymentCat?.id || null,
+          null,
+          null,
+          true // Always approved
+        );
+      }
+    }
+
+    // Seasonal revenue spikes (e.g., end-of-year bonuses)
+    if (month.getMonth() === 11) {
+      // December
+      const seasonalBonus = 20000 + Math.random() * 30000;
+      await createTransaction(
+        "income",
+        new Date(month.getFullYear(), month.getMonth(), 20),
+        seasonalBonus,
+        `End-of-year seasonal bonus for ${format(month, "MMMM yyyy")}`,
+        clientPaymentCat?.id || null,
+        null,
+        null,
+        true // Always approved
+      );
+    }
+
+    // Random high-value transactions
+    if (Math.random() < 0.05) {
+      // 5% chance per month
+      const highValueTransaction = 50000 + Math.random() * 100000;
+      await createTransaction(
+        "income",
+        new Date(month.getFullYear(), month.getMonth(), 15),
+        highValueTransaction,
+        `Unexpected windfall for ${format(month, "MMMM yyyy")}`,
+        clientPaymentCat?.id || null,
+        null,
+        null,
+        true // Always approved
+      );
+    }
+  }
+
+  // Boost client payments for completed projects
+  for (const project of activeProjects) {
+    if (
+      project.status === "completed" &&
+      project.clientId &&
+      clientPaymentCat
+    ) {
+      const maintenanceContract =
+        project.budget * 0.1 * (1 + Math.random() * 0.2); // 10-12% of project budget
+      const maintenanceDate = addMonths(
+        new Date(project.actualEndDate || project.targetEndDate || new Date()),
+        1
+      );
+
+      if (maintenanceDate >= startDate && maintenanceDate <= endDate) {
+        await createTransaction(
+          "income",
+          maintenanceDate,
+          maintenanceContract,
+          `Maintenance contract for completed project: ${project.name}`,
+          clientPaymentCat.id,
+          null,
+          project.id,
+          true // Always approved
+        );
+      }
+    }
+  }
+
+  // Generate revenue from contracts
+  const contractsData = await db.select().from(contracts);
+  for (const contract of contractsData) {
+    if (contract.status === "active" && contract.value && contract.startDate) {
+      const contractRevenue =
+        Number(contract.value) * (0.8 + Math.random() * 0.4); // 80-120% of contract value
+      const revenueDate = new Date(contract.startDate);
+
+      if (revenueDate >= startDate && revenueDate <= endDate) {
+        await createTransaction(
+          "income",
+          revenueDate,
+          contractRevenue,
+          `Revenue from contract: ${contract.title}`,
+          clientPaymentCat?.id || null,
+          null,
+          contract.projectId || null,
+          true // Always approved
+        );
+      }
+    }
+  }
+
+  // Generate revenue from product licensing
+  const productsData = await db.select().from(products);
+  for (const product of productsData) {
+    if (!product.isDeleted) {
+      const licensingRevenue = 10000 + Math.random() * 50000; // Random licensing fee
+      const revenueDate = new Date(
+        startDate.getFullYear(),
+        startDate.getMonth(),
+        15
+      );
+
+      await createTransaction(
+        "income",
+        revenueDate,
+        licensingRevenue,
+        `Licensing revenue for product: ${product.name}`,
+        clientPaymentCat?.id || null,
+        null,
+        null,
+        true // Always approved
+      );
+    }
+  }
+
+  // Generate revenue from SLAs
+  const slaData = await db.select().from(serviceLevelAgreements);
+  for (const sla of slaData) {
+    if (sla.startDate && sla.uptimePercentage) {
+      const slaRevenue = Number(sla.uptimePercentage) * 1000; // Revenue based on uptime percentage
+      const revenueDate = new Date(sla.startDate);
+
+      if (revenueDate >= startDate && revenueDate <= endDate) {
+        await createTransaction(
+          "income",
+          revenueDate,
+          slaRevenue,
+          `Revenue from SLA: ${sla.title}`,
+          clientPaymentCat?.id || null,
+          null,
+          null,
+          true // Always approved
+        );
+      }
+    }
+  }
+
+  // Upsell services to existing clients
+  const clientsData = await db.select().from(clients);
+  for (const client of clientsData) {
+    if (!client.isDeleted) {
+      const upsellRevenue = 5000 + Math.random() * 20000; // Random upsell amount
+      const revenueDate = new Date(
+        startDate.getFullYear(),
+        startDate.getMonth(),
+        20
+      );
+
+      await createTransaction(
+        "income",
+        revenueDate,
+        upsellRevenue,
+        `Upsell services to client: ${client.name}`,
+        clientPaymentCat?.id || null,
+        null,
+        null,
+        true // Always approved
+      );
+    }
+  }
+
+  // Adjust project budgets to generate additional income
+  for (const project of activeProjects) {
+    if (project.status === "active" && project.budget) {
+      const additionalIncome = project.budget * 0.15; // 15% additional income
+      const revenueDate = new Date(
+        startDate.getFullYear(),
+        startDate.getMonth(),
+        25
+      );
+
+      await createTransaction(
+        "income",
+        revenueDate,
+        additionalIncome,
+        `Additional income from project: ${project.name}`,
+        clientPaymentCat?.id || null,
+        null,
+        project.id,
+        true // Always approved
       );
     }
   }

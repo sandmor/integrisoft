@@ -3,8 +3,13 @@ import { getClients } from "@/lib/actions/clients";
 import { tryCatch } from "@/lib/error-handler";
 import { GetClientsParams, Client } from "@/lib/types/clients";
 import { PaginatedResponse } from "@/lib/types";
+import { validateSession } from "@/lib/permission-handler";
 
 export async function GET(request: NextRequest) {
+  if (!(await validateSession("read_clients"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const page = Number(searchParams.get("page") || "0");
   const pageSize = Number(searchParams.get("pageSize") || "10");

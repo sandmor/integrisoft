@@ -5,7 +5,6 @@ import {
   getEmployeeById,
 } from "@/lib/actions/employees";
 import { tryCatch } from "@/lib/error-handler";
-import { auth } from "@/lib/auth";
 import {
   GetEmployeesParams,
   Employee,
@@ -13,8 +12,13 @@ import {
 } from "@/lib/types/employees";
 import { PaginatedResponse } from "@/lib/types";
 import { revalidatePath } from "next/cache";
+import { validateSession } from "@/lib/permission-handler";
 
 export async function GET(request: NextRequest) {
+  if (!(await validateSession("read_employees"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const page = Number(searchParams.get("page") || "0");
   const pageSize = Number(searchParams.get("pageSize") || "10");
@@ -78,8 +82,7 @@ export async function GET(request: NextRequest) {
 
 // POST /api/employees - Create a new employee
 export async function POST(req: NextRequest) {
-  const session = await auth.api.getSession({ headers: req.headers });
-  if (!session?.user) {
+  if (!(await validateSession("write_employees"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

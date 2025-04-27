@@ -5,7 +5,7 @@ import {
   deleteEmployee,
 } from "@/lib/actions/employees";
 import { tryCatch } from "@/lib/error-handler";
-import { auth } from "@/lib/auth";
+import { validateSession } from "@/lib/permission-handler";
 import { Employee, UpdateEmployeeRequest } from "@/lib/types/employees";
 import { revalidatePath } from "next/cache";
 
@@ -14,6 +14,9 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await validateSession("read_employees"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const { id } = await params;
 
   try {
@@ -43,8 +46,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth.api.getSession({ headers: req.headers });
-  if (!session?.user) {
+  if (!(await validateSession("write_employees"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await params;
@@ -89,8 +91,7 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth.api.getSession({ headers: req.headers });
-  if (!session?.user) {
+  if (!(await validateSession("write_employees"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await params;

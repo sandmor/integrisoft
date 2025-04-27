@@ -9,26 +9,22 @@ import {
   transactionCategories,
 } from "@/lib/db/schema";
 import { eq, and, or, gte, lte, not } from "drizzle-orm";
-import { auth } from "@/lib/auth";
 import { sql } from "drizzle-orm";
 import { headers } from "next/headers";
 import { BudgetDetail } from "@/lib/types";
 import { revalidatePath } from "next/cache";
 import { getBudgetById } from "@/lib/actions/finances";
+import { validateSession } from "@/lib/permission-handler";
 
 // GET /api/finances/budgets/[id] - Get a single budget by ID
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await validateSession("read_budgets"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { id } = await params;
 
     const budget = await getBudgetById(id);
@@ -51,14 +47,10 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await validateSession("write_budgets"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { id } = await params;
     const data = await req.json();
 
@@ -290,14 +282,10 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await validateSession("write_budgets"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { id } = await params;
 
     // Validate if budget exists

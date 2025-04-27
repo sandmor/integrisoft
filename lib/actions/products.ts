@@ -224,9 +224,6 @@ export async function getProductById(id: string) {
 export async function createProduct(
   data: CreateProductRequest
 ): Promise<string> {
-  const session = await auth.api.getSession({ headers: await headers() });
-  const userId = session?.user?.id;
-  if (!userId) throw new Error("Unauthorized");
   const id = createId();
   const now = new Date();
   await db.insert(products).values({
@@ -245,9 +242,6 @@ export async function createProduct(
 }
 
 export async function updateProduct(id: string, data: UpdateProductRequest) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  const userId = session?.user?.id;
-  if (!userId) throw new Error("Unauthorized");
   await db
     .update(products)
     .set({
@@ -264,9 +258,6 @@ export async function updateProduct(id: string, data: UpdateProductRequest) {
 }
 
 export async function deleteProduct(id: string) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  const userId = session?.user?.id;
-  if (!userId) throw new Error("Unauthorized");
   await db
     .update(products)
     .set({ isDeleted: true, updatedAt: new Date() })

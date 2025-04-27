@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { getProducts, createProduct } from "@/lib/actions/products";
 import { tryCatch } from "@/lib/error-handler";
 import { GetProductsParams, CreateProductRequest } from "@/lib/types/products";
+import { validateSession } from "@/lib/permission-handler";
 
 export async function GET(request: NextRequest) {
+  if (!(await validateSession("read_products"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const url = request.nextUrl;
   const page = Number(url.searchParams.get("page") || "0");
   const pageSize = Number(url.searchParams.get("pageSize") || "10");
@@ -25,6 +29,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  if (!(await validateSession("write_products"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const body = (await request.json()) as CreateProductRequest;
   const id = await tryCatch(() => createProduct(body), {
     customErrorMessage: "Failed to create product",

@@ -17,7 +17,7 @@ export async function generateUsers(
   // Create admin user first
   const adminUser = {
     id: createId(),
-    email: "admin@example.com",
+    email: "admin@integrisoft.com",
     emailVerified: true,
     name: "Admin",
     lastName: "User",
@@ -54,7 +54,7 @@ export async function generateUsers(
     const email = faker.internet.email({
       firstName,
       lastName,
-      provider: "example.com",
+      provider: "integrisoft.com",
     });
 
     await tx

@@ -3,14 +3,14 @@ import { deleteClientContact } from "@/lib/actions/clients";
 import { tryCatch } from "@/lib/error-handler";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { validateSession } from "@/lib/permission-handler";
 
 // DELETE /api/contacts/[id] - Delete a contact
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth.api.getSession({ headers: req.headers });
-  if (!session?.user) {
+  if (!(await validateSession("write_client_contacts"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await params;

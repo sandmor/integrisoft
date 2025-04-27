@@ -8,7 +8,7 @@ import {
   activitiesFeed,
 } from "@/lib/db/schema";
 import { eq, and, not, sql } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { validateSession } from "@/lib/permission-handler";
 import { headers } from "next/headers";
 import { createId } from "@paralleldrive/cuid2";
 import { revalidatePath } from "next/cache";
@@ -29,14 +29,10 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string; taskId: string }> }
 ) {
+  if (!(await validateSession("read_tasks"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { projectId, taskId } = await params;
 
     // Get task with related data
@@ -132,15 +128,13 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string; taskId: string }> }
 ) {
+  const userId = await validateSession("write_tasks");
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { projectId, taskId } = await params;
+
     const data: TaskUpdateInput = await req.json();
     const isStatusChange = data.status !== undefined;
     const wasAssignedTo = data.assignedToId !== undefined;
@@ -215,7 +209,7 @@ export async function PATCH(
     if (wasAssignedTo && existingTask.assignedToId !== data.assignedToId) {
       await db.insert(activitiesFeed).values({
         id: createId(),
-        userId: session.user.id,
+        userId: userId,
         action: data.assignedToId ? "assign" : "unassign",
         module: "tasks",
         description: data.assignedToId
@@ -323,14 +317,10 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string; taskId: string }> }
 ) {
+  if (!(await validateSession("write_tasks"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { projectId, taskId } = await params;
 
     // Check if task exists and get its status

@@ -2,25 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { projectTeamMembers, employees, users } from "@/lib/db/schema";
 import { eq, and, not } from "drizzle-orm";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
 import { createId } from "@paralleldrive/cuid2";
 import { revalidatePath } from "next/cache";
 import { TeamMember, TeamMemberCreateInput } from "@/lib/types";
+import { validateSession } from "@/lib/permission-handler";
 
 // GET /api/projects/[projectId]/team-members - Get all team members for a project
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
+  if (!(await validateSession("read_team_members"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { projectId } = await params;
 
     const teamMembers = await db
@@ -70,14 +65,10 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
+  if (!(await validateSession("write_team_members"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { projectId } = await params;
     const teamMemberInput: TeamMemberCreateInput = await req.json();
     const { employeeId, role, allocationPercentage, startDate, endDate } =

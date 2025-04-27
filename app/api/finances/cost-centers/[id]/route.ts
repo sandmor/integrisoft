@@ -12,20 +12,17 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { getCostCenterById } from "@/lib/actions/finances";
+import { validateSession } from "@/lib/permission-handler";
 
 // GET /api/finances/cost-centers/[id] - Get a single cost center by ID
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await validateSession("read_cost_centers"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { id } = await params;
 
     const costCenter = await getCostCenterById(id);
@@ -52,14 +49,10 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await validateSession("write_cost_centers"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { id } = await params;
     const data = await req.json();
 
@@ -180,14 +173,10 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await validateSession("write_cost_centers"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { id } = await params;
 
     // Validate if cost center exists

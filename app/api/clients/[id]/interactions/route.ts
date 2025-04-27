@@ -7,12 +7,16 @@ import {
   AddClientInteractionRequest,
 } from "@/lib/types/clients";
 import { revalidatePath } from "next/cache";
+import { validateSession } from "@/lib/permission-handler";
 
 // GET /api/clients/[id]/interactions - Get interactions for a specific client
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await validateSession("read_interactions"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const { id } = await params;
 
   try {
@@ -41,8 +45,9 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth.api.getSession({ headers: req.headers });
-  if (!session?.user) {
+  const userId = await validateSession("write_interactions");
+
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await params;
@@ -51,7 +56,7 @@ export async function POST(
     const data = (await req.json()) as AddClientInteractionRequest;
     const interactionId = await tryCatch(
       () =>
-        addClientInteraction(id, {
+        addClientInteraction(userId, id, {
           contactId: data.contactId,
           type: data.type,
           summary: data.summary,

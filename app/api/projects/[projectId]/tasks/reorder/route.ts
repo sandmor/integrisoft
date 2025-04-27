@@ -5,20 +5,17 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { TaskReorderInput, TaskStatus } from "@/lib/types";
 import { revalidatePath } from "next/cache";
+import { validateSession } from "@/lib/permission-handler";
 
 // POST /api/projects/[projectId]/tasks/reorder - Reorder tasks within a column
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
+  if (!(await validateSession("write_tasks"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { projectId } = await params;
     const body: TaskReorderInput = await req.json();
     const { status, taskIds } = body;

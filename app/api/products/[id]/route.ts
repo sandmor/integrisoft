@@ -6,11 +6,15 @@ import {
 } from "@/lib/actions/products";
 import { tryCatch } from "@/lib/error-handler";
 import { UpdateProductRequest } from "@/lib/types/products";
+import { validateSession } from "@/lib/permission-handler";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await validateSession("read_products"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const { id } = await params;
   const product = await tryCatch(() => getProductById(id), {
     customErrorMessage: "Failed to fetch product",
@@ -22,6 +26,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await validateSession("write_products"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const { id } = await params;
   const body = (await request.json()) as UpdateProductRequest;
   const updatedId = await tryCatch(() => updateProduct(id, body), {
@@ -34,6 +41,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!(await validateSession("write_products"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const { id } = await params;
   await tryCatch(() => deleteProduct(id), {
     customErrorMessage: "Failed to delete product",

@@ -156,7 +156,7 @@ export function ClientForm({ client, accountManagers }: ClientFormProps) {
                 <FormItem>
                   <FormLabel>Website</FormLabel>
                   <FormControl>
-                    <Input placeholder="https://example.com" {...field} />
+                    <Input placeholder="https://integrisoft.com" {...field} />
                   </FormControl>
                   <FormDescription>
                     Include the full URL (https://).

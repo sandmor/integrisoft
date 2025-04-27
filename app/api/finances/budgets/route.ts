@@ -1,28 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import {
-  budgets,
-  costCenters,
-  projects,
-  users,
-  transactions,
-} from "@/lib/db/schema";
-import { count, eq, and, asc, desc, like, gte, lte, or } from "drizzle-orm";
-import { auth } from "@/lib/auth";
-import { sql } from "drizzle-orm";
-import { headers } from "next/headers";
+import { budgets, costCenters, projects, users } from "@/lib/db/schema";
+import { eq, and, gte, lte, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getBudgetList } from "@/lib/actions/finances";
+import { validateSession } from "@/lib/permission-handler";
 
 // GET /api/finances/budgets - Get all budgets with filtering, sorting and pagination
 export async function GET(req: NextRequest) {
+  if (!(await validateSession("read_budgets"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
     const searchParams = req.nextUrl.searchParams;
 
     const page = parseInt(searchParams.get("page") || "1");
@@ -56,14 +45,10 @@ export async function GET(req: NextRequest) {
 
 // POST /api/finances/budgets - Create a new budget
 export async function POST(req: NextRequest) {
+  if (!(await validateSession("write_budgets"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const data = await req.json();
 
     // Validate required fields
@@ -195,7 +180,7 @@ export async function POST(req: NextRequest) {
         endDate: new Date(data.endDate),
         costCenterId: data.costCenterId,
         projectId: data.projectId,
-        createdById: session.user.id,
+        createdById: data.createdById,
         createdAt: new Date(),
         updatedAt: new Date(),
         isDeleted: false,

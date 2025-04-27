@@ -4,14 +4,14 @@ import { tryCatch } from "@/lib/error-handler";
 import { auth } from "@/lib/auth";
 import { ClientContact, AddClientContactRequest } from "@/lib/types/clients";
 import { revalidatePath } from "next/cache";
+import { validateSession } from "@/lib/permission-handler";
 
 // GET /api/clients/[id]/contacts - Get contacts for a specific client
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth.api.getSession({ headers: req.headers });
-  if (!session?.user) {
+  if (!(await validateSession("read_client_contacts"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await params;
@@ -40,8 +40,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth.api.getSession({ headers: req.headers });
-  if (!session?.user) {
+  if (!(await validateSession("write_client_contacts"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await params;

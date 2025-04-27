@@ -220,7 +220,10 @@ export function ClientContactsTab({
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input placeholder="john.doe@example.com" {...field} />
+                        <Input
+                          placeholder="john.doe@integrisoft.com"
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

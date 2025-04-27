@@ -6,21 +6,18 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { Milestone, MilestoneUpdateInput } from "@/lib/types";
+import { validateSession } from "@/lib/permission-handler";
 
 // GET /api/projects/[projectId]/milestones/[milestoneId] - Get a single milestone by ID
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string; milestoneId: string }> }
 ) {
+  if (!(await validateSession("read_projects"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const { projectId, milestoneId } = await params;
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     // Check if milestone exists and belongs to the project
     const milestone = await db.query.milestones.findFirst({
       where: (milestone, { eq, and, not }) =>
@@ -64,15 +61,11 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string; milestoneId: string }> }
 ) {
+  if (!(await validateSession("write_projects"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const { projectId, milestoneId } = await params;
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const data: MilestoneUpdateInput = await req.json();
 
     // Check if milestone exists
@@ -147,14 +140,10 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string; milestoneId: string }> }
 ) {
+  if (!(await validateSession("write_projects"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { projectId, milestoneId } = await params;
 
     // Check if milestone exists

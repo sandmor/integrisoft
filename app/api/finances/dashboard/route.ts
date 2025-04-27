@@ -17,9 +17,16 @@ import {
   isNotNull,
 } from "drizzle-orm";
 import { FinancialDashboardResponse } from "@/lib/types";
+import { validateSession } from "@/lib/permission-handler";
 
 // Get financial dashboard data
 export async function GET() {
+  if (!(await validateSession("read_financial_dashboard"))) {
+    return NextResponse.json(
+      { success: false, error: "Unauthorized" },
+      { status: 401 }
+    );
+  }
   try {
     const currentDate = new Date();
     const currentMonth = new Date(

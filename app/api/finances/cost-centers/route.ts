@@ -7,21 +7,17 @@ import {
   transactions,
 } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { validateSession } from "@/lib/permission-handler";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { getCostCentersList } from "@/lib/actions/finances";
 
 // GET /api/finances/cost-centers - Get all cost centers
 export async function GET(req: NextRequest) {
+  if (!(await validateSession("read_cost_centers"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const searchParams = req.nextUrl.searchParams;
     const departmentIdParam = searchParams.get("departmentId");
     const departmentId =
@@ -45,14 +41,10 @@ export async function GET(req: NextRequest) {
 
 // POST /api/finances/cost-centers - Create a new cost center
 export async function POST(req: NextRequest) {
+  if (!(await validateSession("write_cost_centers"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const data = await req.json();
 
     // Validate required fields

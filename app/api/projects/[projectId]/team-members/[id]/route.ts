@@ -6,20 +6,17 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { TeamMember, TeamMemberUpdateInput } from "@/lib/types";
 import { revalidatePath } from "next/cache";
+import { validateSession } from "@/lib/permission-handler";
 
 // GET /api/projects/[projectId]/team-members/[id] - Get a specific team member
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string; id: string }> }
 ) {
+  if (!(await validateSession("read_team_members"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { projectId, id } = await params;
 
     const [teamMember] = await db
@@ -78,14 +75,10 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string; id: string }> }
 ) {
+  if (!(await validateSession("write_team_members"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { projectId, id } = await params;
     const updateData: TeamMemberUpdateInput = await req.json();
     const { role, allocationPercentage, startDate, endDate } = updateData;
@@ -172,14 +165,10 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string; id: string }> }
 ) {
+  if (!(await validateSession("write_team_members"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { projectId, id } = await params;
 
     // Verify that team member exists and belongs to the project

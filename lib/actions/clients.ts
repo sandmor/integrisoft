@@ -12,12 +12,9 @@ import {
   users,
 } from "../db/schema";
 import { eq, and, desc, count, inArray, ilike, asc } from "drizzle-orm";
-import { headers } from "next/headers";
 import {
   Client,
   GetClientsParams,
-  CreateClientRequest,
-  UpdateClientRequest,
   AddClientContactRequest,
   AddClientInteractionRequest,
 } from "../types/clients";
@@ -291,97 +288,10 @@ export async function getAccountManagers() {
   return managers;
 }
 
-export async function createClient(data: CreateClientRequest): Promise<string> {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  const userId = session?.user?.id;
-
-  if (!userId) {
-    throw new Error("Unauthorized");
-  }
-
-  const id = createId();
-  const timestamp = new Date();
-
-  // Insert the new client
-  await db.insert(clients).values({
-    id,
-    name: data.name,
-    industry: data.industry || null,
-    website: data.website || null,
-    address: data.address || null,
-    accountManagerId: data.accountManagerId || null,
-    createdById: userId,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-    isDeleted: false,
-  });
-
-  return id;
-}
-
-export async function updateClient(id: string, data: UpdateClientRequest) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  const userId = session?.user?.id;
-
-  if (!userId) {
-    throw new Error("Unauthorized");
-  }
-
-  // Update the client
-  await db
-    .update(clients)
-    .set({
-      name: data.name,
-      industry: data.industry || null,
-      website: data.website || null,
-      address: data.address || null,
-      accountManagerId: data.accountManagerId || null,
-      updatedAt: new Date(),
-    })
-    .where(eq(clients.id, id));
-
-  return id;
-}
-
-export async function deleteClient(id: string) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  const userId = session?.user?.id;
-
-  if (!userId) {
-    throw new Error("Unauthorized");
-  }
-
-  // Soft delete the client
-  await db
-    .update(clients)
-    .set({
-      isDeleted: true,
-      updatedAt: new Date(),
-    })
-    .where(eq(clients.id, id));
-
-  return true;
-}
-
 export async function addClientContact(
   clientId: string,
   data: AddClientContactRequest
 ) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  const userId = session?.user?.id;
-
-  if (!userId) {
-    throw new Error("Unauthorized");
-  }
-
   const id = createId();
   const timestamp = new Date();
 
@@ -417,15 +327,6 @@ export async function addClientContact(
 }
 
 export async function deleteClientContact(id: string) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  const userId = session?.user?.id;
-
-  if (!userId) {
-    throw new Error("Unauthorized");
-  }
-
   // Soft delete the contact
   await db
     .update(clientContacts)
@@ -439,18 +340,10 @@ export async function deleteClientContact(id: string) {
 }
 
 export async function addClientInteraction(
+  userId: string,
   clientId: string,
   data: AddClientInteractionRequest
 ) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  const userId = session?.user?.id;
-
-  if (!userId) {
-    throw new Error("Unauthorized");
-  }
-
   // Find the employee ID associated with the current user
   const employee = await db
     .select({ id: employees.id })
@@ -487,15 +380,6 @@ export async function addClientInteraction(
 }
 
 export async function deleteClientInteraction(id: string) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  const userId = session?.user?.id;
-
-  if (!userId) {
-    throw new Error("Unauthorized");
-  }
-
   // Soft delete the interaction
   await db
     .update(clientInteractions)

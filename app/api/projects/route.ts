@@ -1,34 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import {
-  projects,
-  clients,
-  employees,
-  tasks,
-  users,
-  milestones,
-} from "@/lib/db/schema";
-import { count, eq, and, sql, not, asc, desc, like, sum } from "drizzle-orm";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
-import {
-  Project,
-  ProjectCreateInput,
-  ProjectStatus,
-  PaginatedResponse,
-} from "@/lib/types";
+import { projects } from "@/lib/db/schema";
+import { ProjectCreateInput } from "@/lib/types";
 import { getProjectsList } from "@/lib/actions/projects";
+import { validateSession } from "@/lib/permission-handler";
 
 // GET /api/projects - List all projects with pagination, sorting, filtering
 export async function GET(req: NextRequest) {
+  if (!(await validateSession("read_projects"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     // Get query parameters
     const searchParams = req.nextUrl.searchParams;
     const page = parseInt(searchParams.get("page") || "0");
@@ -58,14 +40,11 @@ export async function GET(req: NextRequest) {
 
 // POST /api/projects - Create a new project
 export async function POST(req: NextRequest) {
+  const userId = await validateSession("write_projects");
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const data: ProjectCreateInput = await req.json();
 
     // Validate required fields
@@ -89,7 +68,7 @@ export async function POST(req: NextRequest) {
         productId: data.productId,
         budget: data.budget,
         managerId: data.managerId,
-        createdById: session.user.id,
+        createdById: userId,
       })
       .returning();
 

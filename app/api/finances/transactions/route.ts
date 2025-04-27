@@ -35,17 +35,14 @@ import {
   TransactionListItem,
 } from "@/lib/types";
 import { getTransactionList } from "@/lib/actions/finances";
+import { validateSession } from "@/lib/permission-handler";
 
 // GET /api/finances/transactions - Get all transactions with filtering, sorting and pagination
 export async function GET(req: NextRequest) {
+  if (!(await validateSession("read_transactions"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const searchParams = req.nextUrl.searchParams;
 
     const page = parseInt(searchParams.get("page") || "1");
@@ -76,14 +73,11 @@ export async function GET(req: NextRequest) {
 
 // POST /api/finances/transactions - Create a new transaction
 export async function POST(req: NextRequest) {
+  const userId = await validateSession("write_transactions");
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const data: TransactionCreateInput = await req.json();
 
     // Validate required fields
@@ -112,7 +106,7 @@ export async function POST(req: NextRequest) {
         categoryId: data.categoryId,
         costCenterId: data.costCenterId,
         projectId: data.projectId,
-        createdById: session.user.id,
+        createdById: userId,
         approvedById: data.approvedById,
         approvedAt: data.approvedById ? new Date() : null,
         createdAt: new Date(),

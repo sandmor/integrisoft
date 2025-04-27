@@ -1,27 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { transactionCategories, transactionTypeEnum } from "@/lib/db/schema";
-import { count, eq, and, not, asc, desc, like, isNull } from "drizzle-orm";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
+import { transactionCategories } from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import {
-  TransactionCategoryWithChildren,
   TransactionCategoryItem,
   TransactionCategoryCreateInput,
 } from "@/lib/types";
 import { getTransactionCategories } from "@/lib/actions/finances";
+import { validateSession } from "@/lib/permission-handler";
 
 // GET /api/finances/categories - Get all transaction categories with optional filtering by type
 export async function GET(req: NextRequest) {
+  if (!(await validateSession("read_categories"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const searchParams = req.nextUrl.searchParams;
     const type = searchParams.get("type");
     const flat = searchParams.get("flat") === "true";
@@ -44,14 +38,10 @@ export async function GET(req: NextRequest) {
 
 // POST /api/finances/categories - Create a new transaction category
 export async function POST(req: NextRequest) {
+  if (!(await validateSession("write_categories"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const data: TransactionCategoryCreateInput = await req.json();
 
     // Validate required fields

@@ -1,25 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { milestones } from "@/lib/db/schema";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
 import { Milestone, MilestoneCreateInput } from "@/lib/types";
 import { revalidatePath } from "next/cache";
+import { validateSession } from "@/lib/permission-handler";
 
 // GET /api/projects/[projectId]/milestones - Get all milestones for a project
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
+  if (!(await validateSession("read_projects"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const { projectId } = await params;
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     // Check if project exists and user has access
     const project = await db.query.projects.findFirst({
       where: (projects, { eq }) => eq(projects.id, projectId),
@@ -64,15 +59,11 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
+  if (!(await validateSession("write_projects"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const { projectId } = await params;
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const data: MilestoneCreateInput = await req.json();
 
     // Check if project exists and user has access

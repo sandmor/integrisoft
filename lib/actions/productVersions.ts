@@ -34,11 +34,9 @@ export async function getVersionsByProductId(
 }
 
 export async function createProductVersion(
-  data: CreateProductVersionRequest
+  data: CreateProductVersionRequest,
+  userId: string
 ): Promise<string> {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user?.id) throw new Error("Unauthorized");
-
   const id = createId();
   const now = new Date();
   await db.insert(productVersions).values({
@@ -48,7 +46,7 @@ export async function createProductVersion(
     status: data.status || "development",
     releaseDate: data.releaseDate ? new Date(data.releaseDate) : null,
     releaseNotes: data.releaseNotes || null,
-    createdById: session.user.id,
+    createdById: userId,
     createdAt: now,
     updatedAt: now,
     isDeleted: false,
@@ -60,8 +58,6 @@ export async function updateProductVersion(
   id: string,
   data: UpdateProductVersionRequest
 ): Promise<string> {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user?.id) throw new Error("Unauthorized");
   await db
     .update(productVersions)
     .set({
@@ -76,8 +72,6 @@ export async function updateProductVersion(
 }
 
 export async function deleteProductVersion(id: string): Promise<boolean> {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user?.id) throw new Error("Unauthorized");
   await db
     .update(productVersions)
     .set({ isDeleted: true, updatedAt: new Date() })

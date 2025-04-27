@@ -137,8 +137,6 @@ export const permissions = pgTable("permissions", {
     .$defaultFn(() => createId()),
   name: varchar("name", { length: 100 }).notNull().unique(),
   description: text("description"),
-  module: varchar("module", { length: 50 }).notNull(),
-  action: varchar("action", { length: 50 }).notNull(), // create, read, update, delete
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });

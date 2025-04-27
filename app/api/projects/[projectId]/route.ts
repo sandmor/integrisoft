@@ -20,20 +20,17 @@ import {
   ProjectStatus,
 } from "@/lib/types";
 import { revalidatePath } from "next/cache";
+import { validateSession } from "@/lib/permission-handler";
 
 // GET /api/projects/[projectId] - Get a single project by ID
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
+  if (!(await validateSession("read_projects"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { projectId } = await params;
 
     // Get basic project info
@@ -209,15 +206,14 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
-  try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const userId = await validateSession("write_projects");
 
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  try {
     const { projectId } = await params;
+
     const data: ProjectUpdateInput = await req.json();
 
     // Check if project exists
@@ -256,7 +252,7 @@ export async function PATCH(
     // Record the activity
     await db.insert(activitiesFeed).values({
       id: Math.random().toString(36).substring(2, 15),
-      userId: session.user.id,
+      userId: userId,
       action: "update",
       module: "projects",
       description: `Project "${data.name}" was updated`,
@@ -284,14 +280,12 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
-  try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const userId = await validateSession("write_projects");
 
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  try {
     const { projectId } = await params;
 
     // Check if project exists
@@ -318,7 +312,7 @@ export async function DELETE(
     // Record the activity
     await db.insert(activitiesFeed).values({
       id: Math.random().toString(36).substring(2, 15),
-      userId: session.user.id,
+      userId: userId,
       action: "delete",
       module: "projects",
       description: `Project "${existingProject.name}" was deleted`,

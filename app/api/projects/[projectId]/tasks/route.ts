@@ -24,20 +24,17 @@ import {
   TaskPriority,
   TasksResponse,
 } from "@/lib/types";
+import { validateSession } from "@/lib/permission-handler";
 
 // GET /api/projects/[projectId]/tasks - Get all tasks for a project
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
+  if (!(await validateSession("read_tasks"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     const { projectId } = await params;
     const url = new URL(req.url);
     const orderByStatus = url.searchParams.get("orderByStatus") === "true";
@@ -233,15 +230,14 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
-  try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  const userId = await validateSession("write_tasks");
 
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  try {
     const { projectId } = await params;
+
     const data: TaskCreateInput = await req.json();
 
     // Validate required fields
@@ -271,7 +267,7 @@ export async function POST(
         estimatedHours: data.estimatedHours,
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
         startDate: data.startDate ? new Date(data.startDate) : null,
-        createdById: session.user.id,
+        createdById: userId,
         createdAt: new Date(),
         updatedAt: new Date(),
         isDeleted: false,
@@ -285,7 +281,7 @@ export async function POST(
     if (data.assignedToId) {
       await db.insert(activitiesFeed).values({
         id: createId(),
-        userId: session.user.id,
+        userId: userId,
         action: "assign",
         module: "tasks",
         description: `Task "${data.title}" was assigned`,

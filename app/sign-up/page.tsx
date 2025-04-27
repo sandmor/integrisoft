@@ -39,7 +39,12 @@ export default function SignUpPage() {
             type="register"
             onSubmit={async (formData) => {
               const data = formData as RegisterFormData;
-              return await signUpAction(data);
+              const result = await signUpAction(data);
+              if (result.error) {
+                return result;
+              }
+              router.push("/dashboard");
+              return {};
             }}
           />
         </CardContent>

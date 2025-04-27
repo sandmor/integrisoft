@@ -15,8 +15,8 @@ export default async function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-24">
       <div className="flex flex-col items-center justify-center gap-6 text-center">
-        <h1 className="text-4xl font-bold">Welcome, Andres</h1>
-        <p className="text-xl">Implement this</p>
+        <h1 className="text-4xl font-bold">IntegriSoft</h1>
+        <p className="text-xl">A startup management solution</p>
         <div className="flex gap-4">
           <Button asChild>
             <Link href="/sign-in">Sign In</Link>

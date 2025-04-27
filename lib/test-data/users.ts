@@ -76,8 +76,8 @@ export async function generateUsers(
 
     userIds.push(userId);
 
-    // Create credentials account for user (70% of users)
-    if (Math.random() < 0.7) {
+    // Create credentials account for user
+    if (Math.random() < 0.7 || true) {
       await tx
         .insert(schema.accounts)
         .values({
@@ -90,10 +90,8 @@ export async function generateUsers(
           updatedAt: faker.date.recent({ days: 30 }),
         })
         .execute();
-    }
-
-    // Create OAuth account for some users (30% of users)
-    if (Math.random() < 0.3) {
+    } else {
+      // Create OAuth accounts for user
       const providers = ["google", "github", "microsoft"];
       const provider = providers[Math.floor(Math.random() * providers.length)];
 

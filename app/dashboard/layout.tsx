@@ -5,6 +5,7 @@ import { DashboardBreadcrumb } from "@/components/dashboard/breadcrumb";
 import { MobileMenu } from "@/components/dashboard/mobile-menu";
 import { getEntityNameById } from "@/lib/actions/dashboard";
 import StoreProvider from "../../components/providers/store-provider";
+import UserMenu from "@/components/dashboard/user-menu";
 
 export default async function DashboardLayout({
   children,
@@ -53,12 +54,11 @@ export default async function DashboardLayout({
         <div className="flex flex-col flex-1 lg:ml-64">
           {/* Header */}
           <header className="bg-background border-b h-16 flex items-center justify-between px-6 sticky top-0 z-10">
-            <div className="lg:hidden">
+            <div className="flex flex-1 items-center space-x-2">
               <MobileMenu />
-            </div>
-            <div className="flex-1 lg:hidden"></div>
-            <div>
               <span className="text-sm font-medium">Welcome, {userName}</span>
+              <div className="flex-1" />
+              <UserMenu />
             </div>
           </header>
 

@@ -67,10 +67,11 @@ export function AuthForm({ type, onSubmit }: AuthFormProps) {
       const result = await onSubmit(data);
       if (result?.error) {
         setError(result.error);
+        setIsPending(false);
       }
+      // keep loading (isPending) true on success until redirect
     } catch (err) {
       setError("An unexpected error occurred.");
-    } finally {
       setIsPending(false);
     }
   }

@@ -43,10 +43,9 @@ export default function LoginPage() {
               });
               if (error) {
                 return { error: error.message ?? "An error occurred" };
-              } else {
-                router.push("/dashboard");
-                return {};
               }
+              await router.push("/dashboard");
+              return {};
             }}
           />
         </CardContent>

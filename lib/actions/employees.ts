@@ -301,7 +301,7 @@ export async function createEmployee(
     await tx.insert(accounts).values({
       id: createId(),
       userId: userId,
-      providerId: "credentials",
+      providerId: "credential",
       accountId: data.email,
       password: hashedPassword,
       createdAt: new Date(),

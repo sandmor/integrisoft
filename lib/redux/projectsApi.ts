@@ -1048,9 +1048,8 @@ export const projectsApi = api.injectEndpoints({
                         if (!Array.isArray(draft.data)) {
                           // Find the current task in its original status column
                           let currentTask: Task | undefined;
-                          let originalStatus: string | undefined;
 
-                          // Find task and its current status
+                          // Find task and its current status, remove it while capturing it
                           for (const [status, tasks] of Object.entries(
                             draft.data
                           )) {
@@ -1060,6 +1059,8 @@ export const projectsApi = api.injectEndpoints({
                             if (taskIndex !== -1) {
                               const typedStatus =
                                 status as keyof typeof draft.data;
+                              // capture the task being moved
+                              currentTask = tasks[taskIndex];
                               draft.data[typedStatus].splice(taskIndex, 1);
                               break;
                             }

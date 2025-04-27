@@ -1,133 +1,103 @@
-import React from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+"use client";
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
-import { ArrowDownIcon, ArrowUpIcon, ArrowUpDown } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
-export interface RecentTransaction {
+interface Transaction {
   id: string;
-  type: "income" | "expense" | "transfer";
-  description: string;
+  type: string;
   amount: number;
+  description: string;
   date: string;
   category?: string;
 }
 
 interface RecentTransactionsProps {
-  transactions: RecentTransaction[];
+  transactions: Transaction[];
   title?: string;
-  className?: string;
   limit?: number;
 }
 
 export function RecentTransactions({
   transactions,
   title = "Recent Transactions",
-  className,
   limit = 5,
 }: RecentTransactionsProps) {
-  const displayTransactions = transactions.slice(0, limit);
+  const limitedTransactions = transactions.slice(0, limit);
 
   return (
-    <Card className={className}>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle>{title}</CardTitle>
-          <CardDescription>Your latest financial activity</CardDescription>
-        </div>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/dashboard/finances/transactions">View all</Link>
-        </Button>
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Description</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {displayTransactions.map((transaction) => (
-              <TableRow key={transaction.id}>
-                <TableCell className="flex items-center gap-2">
-                  <span
-                    className={cn(
-                      "rounded-full p-1",
-                      transaction.type === "income"
-                        ? "bg-green-100"
-                        : transaction.type === "expense"
-                        ? "bg-red-100"
-                        : "bg-blue-100"
+        {limitedTransactions.length > 0 ? (
+          <div className="space-y-4">
+            {limitedTransactions.map((transaction) => (
+              <div
+                key={transaction.id}
+                className="flex items-center justify-between border-b pb-2"
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <Badge
+                      className={`${
+                        transaction.type === "income"
+                          ? "bg-green-100 text-green-800 hover:bg-green-200"
+                          : transaction.type === "expense"
+                          ? "bg-red-100 text-red-800 hover:bg-red-200"
+                          : "bg-blue-100 text-blue-800 hover:bg-blue-200"
+                      }`}
+                    >
+                      {transaction.type.charAt(0).toUpperCase() +
+                        transaction.type.slice(1)}
+                    </Badge>
+                    {transaction.category && (
+                      <span className="text-sm text-muted-foreground">
+                        {transaction.category}
+                      </span>
                     )}
+                  </div>
+                  <Link
+                    href={`/dashboard/finances/transactions/${transaction.id}`}
+                    className="text-lg font-medium text-blue-600 hover:underline"
                   >
-                    {transaction.type === "income" ? (
-                      <ArrowUpIcon className="h-3 w-3 text-green-600" />
-                    ) : transaction.type === "expense" ? (
-                      <ArrowDownIcon className="h-3 w-3 text-red-600" />
-                    ) : (
-                      <ArrowUpDown className="h-3 w-3 text-blue-600" />
-                    )}
-                  </span>
-                  <span className="font-medium">{transaction.description}</span>
-                </TableCell>
-                <TableCell>
-                  {transaction.category && (
-                    <Badge variant="outline">{transaction.category}</Badge>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {new Date(transaction.date).toLocaleDateString()}
-                </TableCell>
-                <TableCell
-                  className={cn(
-                    "text-right font-medium",
+                    {transaction.description ||
+                      `${transaction.type} transaction`}
+                  </Link>
+                  <div className="text-sm text-muted-foreground">
+                    {format(new Date(transaction.date), "PPP")}
+                  </div>
+                </div>
+                <div
+                  className={`text-lg font-bold ${
                     transaction.type === "income"
                       ? "text-green-600"
                       : transaction.type === "expense"
                       ? "text-red-600"
-                      : "text-blue-600"
-                  )}
+                      : ""
+                  }`}
                 >
                   {transaction.type === "income"
                     ? "+"
                     : transaction.type === "expense"
                     ? "-"
                     : ""}
-                  ${transaction.amount.toLocaleString()}
-                </TableCell>
-              </TableRow>
+                  {new Intl.NumberFormat("en-US", {
+                    style: "currency",
+                    currency: "USD",
+                  }).format(Math.abs(transaction.amount))}
+                </div>
+              </div>
             ))}
-            {displayTransactions.length === 0 && (
-              <TableRow>
-                <TableCell
-                  colSpan={4}
-                  className="text-center py-4 text-muted-foreground"
-                >
-                  No recent transactions
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+          </div>
+        ) : (
+          <div className="text-center py-4 text-muted-foreground">
+            No recent transactions
+          </div>
+        )}
       </CardContent>
     </Card>
   );

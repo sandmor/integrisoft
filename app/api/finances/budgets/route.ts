@@ -12,6 +12,7 @@ import { auth } from "@/lib/auth";
 import { sql } from "drizzle-orm";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { getBudgetList } from "@/lib/actions/finances";
 
 // GET /api/finances/budgets - Get all budgets with filtering, sorting and pagination
 export async function GET(req: NextRequest) {
@@ -31,165 +32,19 @@ export async function GET(req: NextRequest) {
     const dateFrom = searchParams.get("dateFrom");
     const dateTo = searchParams.get("dateTo");
 
-    const offset = page * pageSize;
-
-    // Build where conditions
-    let whereConditions = [eq(budgets.isDeleted, false)];
-
-    filters.forEach((filter) => {
-      const [field, value] = filter.split(":");
-
-      if (field === "projectId") {
-        whereConditions.push(eq(budgets.projectId, value));
-      } else if (field === "costCenterId") {
-        whereConditions.push(eq(budgets.costCenterId, value));
-      } else if (field === "createdById") {
-        whereConditions.push(eq(budgets.createdById, value));
-      } else if (field === "amount" && value.includes("-")) {
-        const [min, max] = value.split("-");
-        if (min) whereConditions.push(gte(budgets.amount, min));
-        if (max) whereConditions.push(lte(budgets.amount, max));
-      } else if (field === "name") {
-        whereConditions.push(like(budgets.name, `%${value}%`));
-      } else if (field === "description") {
-        whereConditions.push(like(budgets.description, `%${value}%`));
+    return NextResponse.json(
+      await getBudgetList({
+        page,
+        pageSize,
+        sorts,
+        filters,
+        dateFrom: dateFrom ?? undefined,
+        dateTo: dateTo ?? undefined,
+      }),
+      {
+        status: 200,
       }
-    });
-
-    // Add date range filter if provided
-    if (dateFrom) {
-      whereConditions.push(gte(budgets.startDate, new Date(dateFrom)));
-    }
-    if (dateTo) {
-      whereConditions.push(lte(budgets.endDate, new Date(dateTo)));
-    }
-
-    // Build sort conditions
-    const sortFields: Record<string, any> = {
-      amount: budgets.amount,
-      name: budgets.name,
-      startDate: budgets.startDate,
-      endDate: budgets.endDate,
-      createdAt: budgets.createdAt,
-    };
-
-    let orderBy: any[] = [];
-
-    sorts.forEach((sort) => {
-      const direction = sort.startsWith("-") ? "desc" : "asc";
-      const field = sort.replace(/^[-+]/, "");
-
-      if (sortFields[field]) {
-        if (direction === "asc") {
-          orderBy.push(asc(sortFields[field]));
-        } else {
-          orderBy.push(desc(sortFields[field]));
-        }
-      }
-    });
-
-    // Default sort by startDate desc if no sort specified
-    if (orderBy.length === 0) {
-      orderBy.push(desc(budgets.startDate));
-    }
-
-    // Get total count for pagination
-    const [{ value: totalCount }] = await db
-      .select({ value: count() })
-      .from(budgets)
-      .where(and(...whereConditions));
-
-    // Get paginated budgets with relations
-    const budgetsData = await db
-      .select({
-        id: budgets.id,
-        name: budgets.name,
-        amount: budgets.amount,
-        description: budgets.description,
-        startDate: budgets.startDate,
-        endDate: budgets.endDate,
-        costCenterId: budgets.costCenterId,
-        projectId: budgets.projectId,
-        createdById: budgets.createdById,
-        createdAt: budgets.createdAt,
-        updatedAt: budgets.updatedAt,
-        costCenter: {
-          id: costCenters.id,
-          name: costCenters.name,
-        },
-        project: {
-          id: projects.id,
-          name: projects.name,
-        },
-        createdBy: {
-          id: users.id,
-          name: users.name,
-        },
-      })
-      .from(budgets)
-      .leftJoin(costCenters, eq(budgets.costCenterId, costCenters.id))
-      .leftJoin(projects, eq(budgets.projectId, projects.id))
-      .leftJoin(users, eq(budgets.createdById, users.id))
-      .where(and(...whereConditions))
-      .orderBy(...orderBy)
-      .limit(pageSize)
-      .offset(offset);
-
-    // Get spent amount for each budget
-    const budgetsWithSpent = await Promise.all(
-      budgetsData.map(async (budget) => {
-        // Query to get the sum of transaction amounts for this budget's project or cost center
-        let whereCondition = and(
-          eq(transactions.type, "expense"),
-          eq(transactions.isDeleted, false),
-          gte(transactions.date, budget.startDate),
-          lte(transactions.date, budget.endDate)
-        );
-
-        // Add condition for either project or cost center
-        if (budget.projectId) {
-          whereCondition = and(
-            whereCondition,
-            eq(transactions.projectId, budget.projectId)
-          );
-        } else if (budget.costCenterId) {
-          whereCondition = and(
-            whereCondition,
-            eq(transactions.costCenterId, budget.costCenterId)
-          );
-        }
-
-        const [result] = await db
-          .select({
-            spentAmount: sql<number>`sum(${transactions.amount})`,
-          })
-          .from(transactions)
-          .where(whereCondition);
-
-        const spentAmount = result?.spentAmount || 0;
-        const remainingAmount = Number(budget.amount) - spentAmount;
-        const utilizationPercentage =
-          (spentAmount / Number(budget.amount)) * 100;
-
-        return {
-          ...budget,
-          spentAmount,
-          remainingAmount,
-          utilizationPercentage: parseFloat(utilizationPercentage.toFixed(2)),
-        };
-      })
     );
-
-    // Calculate page count
-    const pageCount = Math.ceil(totalCount / pageSize);
-
-    return NextResponse.json({
-      data: budgetsWithSpent,
-      totalCount,
-      pageCount,
-      page,
-      pageSize,
-    });
   } catch (error) {
     console.error("Error fetching budgets:", error);
     return NextResponse.json(

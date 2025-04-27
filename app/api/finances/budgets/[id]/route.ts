@@ -14,6 +14,7 @@ import { sql } from "drizzle-orm";
 import { headers } from "next/headers";
 import { BudgetDetail } from "@/lib/types";
 import { revalidatePath } from "next/cache";
+import { getBudgetById } from "@/lib/actions/finances";
 
 // GET /api/finances/budgets/[id] - Get a single budget by ID
 export async function GET(
@@ -30,184 +31,12 @@ export async function GET(
 
     const { id } = await params;
 
-    // Get budget with related entities
-    const budget = await db
-      .select({
-        id: budgets.id,
-        name: budgets.name,
-        amount: budgets.amount,
-        description: budgets.description,
-        startDate: budgets.startDate,
-        endDate: budgets.endDate,
-        costCenterId: budgets.costCenterId,
-        projectId: budgets.projectId,
-        createdById: budgets.createdById,
-        createdAt: budgets.createdAt,
-        updatedAt: budgets.updatedAt,
-        costCenter: {
-          id: costCenters.id,
-          name: costCenters.name,
-          budget: costCenters.budget,
-          departmentId: costCenters.departmentId,
-        },
-        project: {
-          id: projects.id,
-          name: projects.name,
-          budget: projects.budget,
-        },
-        createdBy: {
-          id: users.id,
-          name: users.name,
-        },
-      })
-      .from(budgets)
-      .leftJoin(costCenters, eq(budgets.costCenterId, costCenters.id))
-      .leftJoin(projects, eq(budgets.projectId, projects.id))
-      .leftJoin(users, eq(budgets.createdById, users.id))
-      .where(and(eq(budgets.id, id), eq(budgets.isDeleted, false)))
-      .limit(1);
-
-    if (!budget || budget.length === 0) {
+    const budget = await getBudgetById(id);
+    if (!budget) {
       return NextResponse.json({ error: "Budget not found" }, { status: 404 });
     }
 
-    // Get spent amount for this budget
-    const dateConditions = and(
-      eq(transactions.isDeleted, false),
-      gte(transactions.date, budget[0].startDate),
-      lte(transactions.date, budget[0].endDate)
-    );
-
-    let whereCondition;
-    if (budget[0].projectId) {
-      whereCondition = and(
-        dateConditions,
-        eq(transactions.projectId, budget[0].projectId)
-      );
-    } else if (budget[0].costCenterId) {
-      whereCondition = and(
-        dateConditions,
-        eq(transactions.costCenterId, budget[0].costCenterId)
-      );
-    } else {
-      whereCondition = dateConditions;
-    }
-
-    const [transactionSummary] = await db
-      .select({
-        spentAmount: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.type} = 'expense' THEN ${transactions.amount} ELSE 0 END), 0)`,
-        incomeAmount: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.type} = 'income' THEN ${transactions.amount} ELSE 0 END), 0)`,
-      })
-      .from(transactions)
-      .where(whereCondition);
-
-    // Parse the string values to numbers for calculations
-    const spentAmount = transactionSummary?.spentAmount || "0";
-    const incomeAmount = transactionSummary?.incomeAmount || "0";
-    const remainingAmount = (
-      parseFloat(budget[0].amount) - parseFloat(spentAmount)
-    ).toString();
-
-    // Calculate utilization percentage but keep as a number for formatting
-    const utilizationPercentage =
-      parseFloat(budget[0].amount) > 0
-        ? (parseFloat(spentAmount) / parseFloat(budget[0].amount)) * 100
-        : 0;
-
-    // Get monthly breakdown of expenses and income
-    let monthlyBreakdownCondition;
-    if (budget[0].projectId) {
-      monthlyBreakdownCondition = and(
-        eq(transactions.isDeleted, false),
-        gte(transactions.date, budget[0].startDate),
-        lte(transactions.date, budget[0].endDate),
-        eq(transactions.projectId, budget[0].projectId)
-      );
-    } else if (budget[0].costCenterId) {
-      monthlyBreakdownCondition = and(
-        eq(transactions.isDeleted, false),
-        gte(transactions.date, budget[0].startDate),
-        lte(transactions.date, budget[0].endDate),
-        eq(transactions.costCenterId, budget[0].costCenterId)
-      );
-    } else {
-      monthlyBreakdownCondition = and(
-        eq(transactions.isDeleted, false),
-        gte(transactions.date, budget[0].startDate),
-        lte(transactions.date, budget[0].endDate)
-      );
-    }
-
-    const monthlyBreakdown = await db
-      .select({
-        month: sql<string>`TO_CHAR(${transactions.date}, 'YYYY-MM')`,
-        expenses: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.type} = 'expense' THEN ${transactions.amount} ELSE 0 END), 0)`,
-        income: sql<string>`COALESCE(SUM(CASE WHEN ${transactions.type} = 'income' THEN ${transactions.amount} ELSE 0 END), 0)`,
-      })
-      .from(transactions)
-      .where(monthlyBreakdownCondition)
-      .groupBy(sql`TO_CHAR(${transactions.date}, 'YYYY-MM')`)
-      .orderBy(sql`TO_CHAR(${transactions.date}, 'YYYY-MM')`);
-
-    // Get top 5 expense categories for this budget
-    let topExpenseCategoriesCondition;
-    if (budget[0].projectId) {
-      topExpenseCategoriesCondition = and(
-        eq(transactions.type, "expense"),
-        eq(transactions.isDeleted, false),
-        gte(transactions.date, budget[0].startDate),
-        lte(transactions.date, budget[0].endDate),
-        eq(transactions.projectId, budget[0].projectId)
-      );
-    } else if (budget[0].costCenterId) {
-      topExpenseCategoriesCondition = and(
-        eq(transactions.type, "expense"),
-        eq(transactions.isDeleted, false),
-        gte(transactions.date, budget[0].startDate),
-        lte(transactions.date, budget[0].endDate),
-        eq(transactions.costCenterId, budget[0].costCenterId)
-      );
-    } else {
-      topExpenseCategoriesCondition = and(
-        eq(transactions.type, "expense"),
-        eq(transactions.isDeleted, false),
-        gte(transactions.date, budget[0].startDate),
-        lte(transactions.date, budget[0].endDate)
-      );
-    }
-
-    const topExpenseCategories = await db
-      .select({
-        categoryId: transactionCategories.id,
-        categoryName: transactionCategories.name,
-        totalAmount: sql<string>`SUM(${transactions.amount})`,
-      })
-      .from(transactions)
-      .innerJoin(
-        transactionCategories,
-        eq(transactions.categoryId, transactionCategories.id)
-      )
-      .where(topExpenseCategoriesCondition)
-      .groupBy(transactions.categoryId)
-      .orderBy(sql`SUM(${transactions.amount})`)
-      .limit(5);
-
-    const response: BudgetDetail = {
-      ...budget[0],
-      createdAt: budget[0].createdAt.toISOString(),
-      updatedAt: budget[0].updatedAt.toISOString(),
-      startDate: budget[0].startDate.toISOString(),
-      endDate: budget[0].endDate.toISOString(),
-      createdBy: budget[0].createdBy ? budget[0].createdBy : undefined,
-      spentAmount,
-      incomeAmount,
-      remainingAmount,
-      utilizationPercentage: parseFloat(utilizationPercentage.toFixed(2)),
-      monthlyBreakdown,
-      topExpenseCategories,
-    };
-
-    return NextResponse.json(response);
+    return NextResponse.json(budget);
   } catch (error) {
     console.error("Error fetching budget:", error);
     return NextResponse.json(

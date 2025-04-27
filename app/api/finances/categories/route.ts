@@ -10,6 +10,7 @@ import {
   TransactionCategoryItem,
   TransactionCategoryCreateInput,
 } from "@/lib/types";
+import { getTransactionCategories } from "@/lib/actions/finances";
 
 // GET /api/finances/categories - Get all transaction categories with optional filtering by type
 export async function GET(req: NextRequest) {
@@ -23,81 +24,14 @@ export async function GET(req: NextRequest) {
 
     const searchParams = req.nextUrl.searchParams;
     const type = searchParams.get("type");
-
-    // Build where conditions
-    let whereConditions = [eq(transactionCategories.isDeleted, false)];
-
-    if (type) {
-      whereConditions.push(
-        eq(
-          transactionCategories.type,
-          type as (typeof transactionTypeEnum.enumValues)[number]
-        )
-      );
-    }
-
-    // Get all categories
-    const categories = await db
-      .select({
-        id: transactionCategories.id,
-        name: transactionCategories.name,
-        type: transactionCategories.type,
-        description: transactionCategories.description,
-        parentCategoryId: transactionCategories.parentCategoryId,
-        createdAt: transactionCategories.createdAt,
-        updatedAt: transactionCategories.updatedAt,
-      })
-      .from(transactionCategories)
-      .where(and(...whereConditions))
-      .orderBy(asc(transactionCategories.name));
-
-    // If flat=true query param is provided, return flat structure
-    if (searchParams.get("flat") === "true") {
-      const formattedCategories = categories.map((cat) => ({
-        ...cat,
-        createdAt: cat.createdAt.toISOString(),
-        updatedAt: cat.updatedAt.toISOString(),
-      }));
-      return NextResponse.json(
-        formattedCategories as TransactionCategoryItem[]
-      );
-    }
-
-    // Group by parent category to create hierarchical structure
-    const rootCategories = categories.filter((cat) => !cat.parentCategoryId);
-    const categoriesMap = new Map<string, TransactionCategoryWithChildren>(
-      categories.map((cat) => [
-        cat.id,
-        {
-          ...cat,
-          createdAt: cat.createdAt.toISOString(),
-          updatedAt: cat.updatedAt.toISOString(),
-          children: [],
-        },
-      ])
-    );
-
-    // Add child categories to their parents
-    categories.forEach((cat) => {
-      if (cat.parentCategoryId && categoriesMap.has(cat.parentCategoryId)) {
-        const parent = categoriesMap.get(cat.parentCategoryId);
-        if (parent) {
-          parent.children.push(
-            categoriesMap.get(cat.id) || {
-              ...cat,
-              createdAt: cat.createdAt.toISOString(),
-              updatedAt: cat.updatedAt.toISOString(),
-              children: [],
-            }
-          );
-        }
-      }
-    });
+    const flat = searchParams.get("flat") === "true";
 
     return NextResponse.json(
-      rootCategories.map((cat) =>
-        categoriesMap.get(cat.id)
-      ) as TransactionCategoryWithChildren[]
+      await getTransactionCategories({
+        type: type as any,
+        flat,
+      }),
+      { status: 200 }
     );
   } catch (error) {
     console.error("Error fetching transaction categories:", error);

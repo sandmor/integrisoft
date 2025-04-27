@@ -8,10 +8,10 @@ import { CreateProductVersionRequest } from "@/lib/types/productVersions";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id: productId } = params;
-  const versions = await tryCatch(() => getVersionsByProductId(productId), {
+  const { id } = await params;
+  const versions = await tryCatch(() => getVersionsByProductId(id), {
     customErrorMessage: "Failed to fetch product versions",
   });
   return NextResponse.json(versions);
@@ -19,11 +19,11 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id: productId } = params;
+  const { id } = await params;
   const body = (await request.json()) as CreateProductVersionRequest;
-  body.productId = productId;
+  body.productId = id;
   const newId = await tryCatch(() => createProductVersion(body), {
     customErrorMessage: "Failed to create product version",
   });

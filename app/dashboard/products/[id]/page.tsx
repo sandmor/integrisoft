@@ -11,10 +11,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { Box, GitBranchPlus, List } from "lucide-react";
 
-interface ProductDetailPageProps {
-  params: { id: string };
-}
-
 async function ProductDetails({ productId }: { productId: string }) {
   const product = await tryCatch(() => getProductById(productId), {
     customErrorMessage: "Failed to load product details",
@@ -81,7 +77,13 @@ async function ProductDetails({ productId }: { productId: string }) {
   );
 }
 
-export default function ProductDetailPage({ params }: ProductDetailPageProps) {
+export default async function ProductDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <Suspense
@@ -92,7 +94,7 @@ export default function ProductDetailPage({ params }: ProductDetailPageProps) {
           </div>
         }
       >
-        <ProductDetails productId={params.id} />
+        <ProductDetails productId={id} />
       </Suspense>
     </div>
   );

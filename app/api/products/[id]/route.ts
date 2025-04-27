@@ -9,9 +9,9 @@ import { UpdateProductRequest } from "@/lib/types/products";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  const { id } = await params;
   const product = await tryCatch(() => getProductById(id), {
     customErrorMessage: "Failed to fetch product",
   });
@@ -20,9 +20,9 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  const { id } = await params;
   const body = (await request.json()) as UpdateProductRequest;
   const updatedId = await tryCatch(() => updateProduct(id, body), {
     customErrorMessage: "Failed to update product",
@@ -32,9 +32,9 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = params;
+  const { id } = await params;
   await tryCatch(() => deleteProduct(id), {
     customErrorMessage: "Failed to delete product",
   });

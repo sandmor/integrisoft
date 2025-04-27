@@ -402,6 +402,33 @@ export async function getEntityNameById(
       }
     }
 
+    if (type == "cost-centers") {
+      const result = await db.query.costCenters.findFirst({
+        where: (costCenters, { eq, and }) =>
+          and(eq(costCenters.id, id), eq(costCenters.isDeleted, false)),
+      });
+      if (result) {
+        return {
+          id,
+          name: result.name,
+        };
+      }
+    }
+
+    if (type === "transactions") {
+      const result = await db.query.transactions.findFirst({
+        where: (transactions, { eq, and }) =>
+          and(eq(transactions.id, id), eq(transactions.isDeleted, false)),
+      });
+      if (result) {
+        const label =
+          result.type.charAt(0).toUpperCase() + result.type.slice(1);
+        const amount = parseFloat(result.amount.toString()).toFixed(2);
+        const dateStr = new Date(result.date).toISOString().split("T")[0];
+        return { id, name: `${label} $${amount} on ${dateStr}` };
+      }
+    }
+
     return null;
   } catch (error) {
     console.error(`Error fetching ${type} name:`, error);

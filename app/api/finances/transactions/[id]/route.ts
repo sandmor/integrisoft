@@ -12,6 +12,7 @@ import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { TransactionDetail, TransactionUpdateInput } from "@/lib/types";
 import { revalidatePath } from "next/cache";
+import { getTransactionById } from "@/lib/actions/finances";
 
 // GET /api/finances/transactions/[id] - Get a single transaction by ID
 export async function GET(
@@ -28,72 +29,16 @@ export async function GET(
 
     const { id } = await params;
 
-    const transaction = await db
-      .select({
-        id: transactions.id,
-        type: transactions.type,
-        amount: transactions.amount,
-        description: transactions.description,
-        date: transactions.date,
-        categoryId: transactions.categoryId,
-        costCenterId: transactions.costCenterId,
-        projectId: transactions.projectId,
-        createdById: transactions.createdById,
-        approvedById: transactions.approvedById,
-        approvedAt: transactions.approvedAt,
-        createdAt: transactions.createdAt,
-        updatedAt: transactions.updatedAt,
-        category: {
-          id: transactionCategories.id,
-          name: transactionCategories.name,
-          type: transactionCategories.type,
-        },
-        costCenter: {
-          id: costCenters.id,
-          name: costCenters.name,
-        },
-        project: {
-          id: projects.id,
-          name: projects.name,
-        },
-        createdBy: {
-          id: users.id,
-          name: users.name,
-        },
-        approvedBy: {
-          id: users.id,
-          name: users.name,
-        },
-      })
-      .from(transactions)
-      .leftJoin(
-        transactionCategories,
-        eq(transactions.categoryId, transactionCategories.id)
-      )
-      .leftJoin(costCenters, eq(transactions.costCenterId, costCenters.id))
-      .leftJoin(projects, eq(transactions.projectId, projects.id))
-      .leftJoin(users, eq(transactions.createdById, users.id))
-      .where(and(eq(transactions.id, id), eq(transactions.isDeleted, false)))
-      .limit(1);
+    const transaction = await getTransactionById(id);
 
-    if (!transaction || transaction.length === 0) {
+    if (!transaction) {
       return NextResponse.json(
         { error: "Transaction not found" },
         { status: 404 }
       );
+    } else {
+      return NextResponse.json(transaction);
     }
-
-    // Convert date fields to ISO strings
-    const result = transaction[0];
-    const transactionWithStringDate = {
-      ...result,
-      date: result.date.toISOString(),
-      approvedAt: result.approvedAt ? result.approvedAt.toISOString() : null,
-      createdAt: result.createdAt.toISOString(),
-      updatedAt: result.updatedAt.toISOString(),
-    };
-
-    return NextResponse.json(transactionWithStringDate as TransactionDetail);
   } catch (error) {
     console.error("Error fetching transaction:", error);
     return NextResponse.json(

@@ -34,6 +34,7 @@ import {
   TransactionCreateInput,
   TransactionListItem,
 } from "@/lib/types";
+import { getTransactionList } from "@/lib/actions/finances";
 
 // GET /api/finances/transactions - Get all transactions with filtering, sorting and pagination
 export async function GET(req: NextRequest) {
@@ -54,156 +55,16 @@ export async function GET(req: NextRequest) {
     const dateFrom = searchParams.get("dateFrom");
     const dateTo = searchParams.get("dateTo");
 
-    const offset = page * pageSize;
-
-    // Build where conditions
-    let whereConditions = [eq(transactions.isDeleted, false)];
-
-    filters.forEach((filter) => {
-      const [field, value] = filter.split(":");
-
-      if (field === "type") {
-        whereConditions.push(
-          eq(
-            transactions.type,
-            value as (typeof transactionTypeEnum.enumValues)[number]
-          )
-        );
-      } else if (field === "categoryId") {
-        whereConditions.push(eq(transactions.categoryId, value));
-      } else if (field === "projectId") {
-        whereConditions.push(eq(transactions.projectId, value));
-      } else if (field === "costCenterId") {
-        whereConditions.push(eq(transactions.costCenterId, value));
-      } else if (field === "createdById") {
-        whereConditions.push(eq(transactions.createdById, value));
-      } else if (field === "approvedById") {
-        whereConditions.push(eq(transactions.approvedById, value));
-      } else if (field === "amount" && value.includes("-")) {
-        const [min, max] = value.split("-");
-        if (min) whereConditions.push(gte(transactions.amount, min));
-        if (max) whereConditions.push(lte(transactions.amount, max));
-      } else if (field === "description") {
-        whereConditions.push(like(transactions.description, `%${value}%`));
-      } else if (field === "approved") {
-        if (value === "true") {
-          whereConditions.push(isNotNull(transactions.approvedById));
-        } else if (value === "false") {
-          whereConditions.push(isNull(transactions.approvedById));
-        }
-      }
-    });
-
-    // Add date range filter if provided
-    if (dateFrom) {
-      whereConditions.push(gte(transactions.date, new Date(dateFrom)));
-    }
-    if (dateTo) {
-      whereConditions.push(lte(transactions.date, new Date(dateTo)));
-    }
-
-    // Build sort conditions
-    const sortFields: Record<string, any> = {
-      amount: transactions.amount,
-      date: transactions.date,
-      createdAt: transactions.createdAt,
-      description: transactions.description,
-      type: transactions.type,
-    };
-
-    let orderBy: any[] = [];
-
-    sorts.forEach((sort) => {
-      const direction = sort.startsWith("-") ? "desc" : "asc";
-      const field = sort.replace(/^[-+]/, "");
-
-      if (sortFields[field]) {
-        if (direction === "asc") {
-          orderBy.push(asc(sortFields[field]));
-        } else {
-          orderBy.push(desc(sortFields[field]));
-        }
-      }
-    });
-
-    // Default sort by date desc if no sort specified
-    if (orderBy.length === 0) {
-      orderBy.push(desc(transactions.date));
-    }
-
-    // Get total count for pagination
-    const [{ value: totalCount }] = await db
-      .select({ value: count() })
-      .from(transactions)
-      .where(and(...whereConditions));
-
-    // Get paginated transactions
-    const transactionsData = await db
-      .select({
-        id: transactions.id,
-        type: transactions.type,
-        amount: transactions.amount,
-        description: transactions.description,
-        date: transactions.date,
-        categoryId: transactions.categoryId,
-        costCenterId: transactions.costCenterId,
-        projectId: transactions.projectId,
-        createdById: transactions.createdById,
-        approvedById: transactions.approvedById,
-        approvedAt: transactions.approvedAt,
-        createdAt: transactions.createdAt,
-        updatedAt: transactions.updatedAt,
-        category: {
-          id: transactionCategories.id,
-          name: transactionCategories.name,
-          type: transactionCategories.type,
-        },
-        costCenter: {
-          id: costCenters.id,
-          name: costCenters.name,
-        },
-        project: {
-          id: projects.id,
-          name: projects.name,
-        },
-        createdBy: {
-          id: users.id,
-          name: users.name,
-        },
+    return NextResponse.json(
+      await getTransactionList({
+        page,
+        pageSize,
+        sorts,
+        filters,
+        dateFrom: dateFrom ?? undefined,
+        dateTo: dateTo ?? undefined,
       })
-      .from(transactions)
-      .leftJoin(
-        transactionCategories,
-        eq(transactions.categoryId, transactionCategories.id)
-      )
-      .leftJoin(costCenters, eq(transactions.costCenterId, costCenters.id))
-      .leftJoin(projects, eq(transactions.projectId, projects.id))
-      .leftJoin(users, eq(transactions.createdById, users.id))
-      .where(and(...whereConditions))
-      .orderBy(...orderBy)
-      .limit(pageSize)
-      .offset(offset);
-
-    // Calculate page count
-    const pageCount = Math.ceil(totalCount / pageSize);
-
-    const response: TransactionListResponse = {
-      data: transactionsData.map((transaction) => ({
-        ...transaction,
-        date: transaction.date.toISOString(),
-        approvedAt: transaction.approvedAt
-          ? transaction.approvedAt.toISOString()
-          : null,
-        createdAt: transaction.createdAt.toISOString(),
-        updatedAt: transaction.updatedAt.toISOString(),
-      })),
-      totalCount,
-      pageCount,
-      page,
-      pageSize,
-    };
-
-    return NextResponse.json(response);
+    );
   } catch (error) {
     console.error("Error fetching transactions:", error);
     return NextResponse.json(

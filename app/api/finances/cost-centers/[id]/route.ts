@@ -11,6 +11,7 @@ import { count, eq, and, not, asc, desc, sum, sql } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { getCostCenterById } from "@/lib/actions/finances";
 
 // GET /api/finances/cost-centers/[id] - Get a single cost center by ID
 export async function GET(
@@ -27,149 +28,16 @@ export async function GET(
 
     const { id } = await params;
 
-    // Get cost center with department relation
-    const costCenter = await db
-      .select({
-        id: costCenters.id,
-        name: costCenters.name,
-        description: costCenters.description,
-        budget: costCenters.budget,
-        departmentId: costCenters.departmentId,
-        createdAt: costCenters.createdAt,
-        updatedAt: costCenters.updatedAt,
-        department: {
-          id: departments.id,
-          name: departments.name,
-        },
-      })
-      .from(costCenters)
-      .leftJoin(departments, eq(costCenters.departmentId, departments.id))
-      .where(and(eq(costCenters.id, id), eq(costCenters.isDeleted, false)))
-      .limit(1);
+    const costCenter = await getCostCenterById(id);
 
-    if (!costCenter || costCenter.length === 0) {
+    if (!costCenter) {
       return NextResponse.json(
         { error: "Cost center not found" },
         { status: 404 }
       );
+    } else {
+      return NextResponse.json(costCenter);
     }
-
-    // Get active budgets for this cost center
-    const activeBudgets = await db
-      .select({
-        id: budgets.id,
-        name: budgets.name,
-        amount: budgets.amount,
-        startDate: budgets.startDate,
-        endDate: budgets.endDate,
-        createdAt: budgets.createdAt,
-        updatedAt: budgets.updatedAt,
-      })
-      .from(budgets)
-      .where(and(eq(budgets.costCenterId, id), eq(budgets.isDeleted, false)))
-      .orderBy(desc(budgets.startDate))
-      .limit(10);
-
-    // Get financial summary
-    // 1. Calculate total expense and income transactions
-    const [transactionSummary] = await db
-      .select({
-        totalExpenses: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.type} = 'expense' THEN ${transactions.amount} ELSE 0 END), 0)`,
-        totalIncome: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.type} = 'income' THEN ${transactions.amount} ELSE 0 END), 0)`,
-        transactionCount: count(),
-      })
-      .from(transactions)
-      .where(
-        and(
-          eq(transactions.costCenterId, id),
-          eq(transactions.isDeleted, false)
-        )
-      );
-
-    // 2. Get monthly breakdown
-    const monthlyBreakdown = await db
-      .select({
-        month: sql<string>`TO_CHAR(${transactions.date}, 'YYYY-MM')`,
-        expenses: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.type} = 'expense' THEN ${transactions.amount} ELSE 0 END), 0)`,
-        income: sql<number>`COALESCE(SUM(CASE WHEN ${transactions.type} = 'income' THEN ${transactions.amount} ELSE 0 END), 0)`,
-      })
-      .from(transactions)
-      .where(
-        and(
-          eq(transactions.costCenterId, id),
-          eq(transactions.isDeleted, false)
-        )
-      )
-      .groupBy(sql`TO_CHAR(${transactions.date}, 'YYYY-MM')`)
-      .orderBy(sql`TO_CHAR(${transactions.date}, 'YYYY-MM')`);
-
-    // 3. Get top expense categories
-    const topExpenseCategories = await db
-      .select({
-        categoryId: transactions.categoryId,
-        categoryName: transactionCategories.name,
-        totalAmount: sql<string>`SUM(${transactions.amount})`,
-      })
-      .from(transactions)
-      .leftJoin(
-        transactionCategories,
-        eq(transactions.categoryId, transactionCategories.id)
-      )
-      .where(
-        and(
-          eq(transactions.costCenterId, id),
-          eq(transactions.type, "expense"),
-          eq(transactions.isDeleted, false)
-        )
-      )
-      .groupBy(transactions.categoryId, transactionCategories.name)
-      .orderBy(desc(sql`SUM(${transactions.amount})`))
-      .limit(5);
-
-    // Get recent transactions
-    const recentTransactions = await db
-      .select({
-        id: transactions.id,
-        type: transactions.type,
-        amount: transactions.amount,
-        description: transactions.description,
-        date: transactions.date,
-        categoryId: transactions.categoryId,
-        categoryName: transactionCategories.name,
-        createdAt: transactions.createdAt,
-      })
-      .from(transactions)
-      .leftJoin(
-        transactionCategories,
-        eq(transactions.categoryId, transactionCategories.id)
-      )
-      .where(
-        and(
-          eq(transactions.costCenterId, id),
-          eq(transactions.isDeleted, false)
-        )
-      )
-      .orderBy(desc(transactions.date))
-      .limit(10);
-
-    // Calculate balance
-    const totalExpenses = transactionSummary?.totalExpenses || 0;
-    const totalIncome = transactionSummary?.totalIncome || 0;
-    const balance = totalIncome - totalExpenses;
-
-    return NextResponse.json({
-      ...costCenter[0],
-      activeBudgets,
-      financialSummary: {
-        totalExpenses,
-        totalIncome,
-        balance,
-        transactionCount: transactionSummary?.transactionCount || 0,
-        monthlyBreakdown,
-        topExpenseCategories,
-      },
-      recentTransactions,
-    });
   } catch (error) {
     console.error("Error fetching cost center:", error);
     return NextResponse.json(

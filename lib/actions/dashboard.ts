@@ -319,14 +319,14 @@ export async function getEntityNameById(
         where: (employees, { eq, and }) =>
           and(eq(employees.id, id), eq(employees.isDeleted, false)),
         with: {
-          users: true,
+          user: true,
         },
       });
 
-      if (result?.users) {
+      if (result?.user) {
         return {
           id,
-          name: `${result.users.name} ${result.users.lastName}`,
+          name: `${result.user.name} ${result.user.lastName}`,
         };
       }
     }
@@ -426,6 +426,19 @@ export async function getEntityNameById(
         const amount = parseFloat(result.amount.toString()).toFixed(2);
         const dateStr = new Date(result.date).toISOString().split("T")[0];
         return { id, name: `${label} $${amount} on ${dateStr}` };
+      }
+    }
+
+    if (type === "budgets") {
+      const result = await db.query.budgets.findFirst({
+        where: (budgets, { eq, and }) =>
+          and(eq(budgets.id, id), eq(budgets.isDeleted, false)),
+      });
+      if (result) {
+        return {
+          id,
+          name: result.name,
+        };
       }
     }
 

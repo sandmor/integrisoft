@@ -33,6 +33,7 @@ import {
 import { Edit, Trash, CheckCircle, XCircle, History } from "lucide-react";
 import Link from "next/link";
 import { useDeleteTransactionMutation } from "@/lib/redux/financesApi";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import { TransactionDetail } from "@/lib/types/finances";
 
@@ -51,9 +52,13 @@ export default function TransactionDetailsClient({
   const handleDelete = async () => {
     try {
       await deleteTransaction(transaction.id).unwrap();
+      toast.success("Transaction deleted successfully");
       router.push("/dashboard/finances/transactions");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to delete transaction:", err);
+      toast.error(
+        `Failed to delete transaction: ${err.data?.error || err.message}`
+      );
     } finally {
       setDeleteDialogOpen(false);
     }

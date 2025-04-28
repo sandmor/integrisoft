@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   useCreateBudgetMutation,
-  useUpdateBudgetMutation,
   useGetCostCentersQuery,
+  useUpdateBudgetMutation,
 } from "@/lib/redux/financesApi";
+import { toast } from "sonner";
 import {
   Card,
   CardHeader,
@@ -63,10 +64,12 @@ export default function BudgetFormClient({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    if (!name.trim() || !amount || !startDate || !endDate) {
-      setError("Name, amount, start and end dates are required");
+
+    if (!name.trim()) {
+      setError("Name is required");
       return;
     }
+
     try {
       if (isNew) {
         await createBudget({
@@ -78,6 +81,7 @@ export default function BudgetFormClient({
           costCenterId: costCenterId || undefined,
           projectId: projectId || undefined,
         }).unwrap();
+        toast.success("Budget created successfully");
         router.push("/dashboard/finances/budgets");
       } else if (budget) {
         await updateBudget({
@@ -90,9 +94,16 @@ export default function BudgetFormClient({
             endDate,
           },
         }).unwrap();
+        toast.success("Budget updated successfully");
         router.push(`/dashboard/finances/budgets/${budget.id}`);
       }
     } catch (err: any) {
+      console.error(err);
+      toast.error(
+        `Failed to ${isNew ? "create" : "update"} budget: ${
+          err.data?.error || err.message
+        }`
+      );
       setError(
         err?.data?.error || `Failed to ${isNew ? "create" : "update"} budget`
       );

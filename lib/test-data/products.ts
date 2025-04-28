@@ -38,25 +38,41 @@ export async function generateProducts(
   // Get potential product managers and tech leads
   const potentialManagers = await tx.query.employees.findMany({
     with: {
-      positions: true,
-      users: true,
+      position: true,
+      user: true,
     },
   });
 
+  // Fetch user roles for all potential managers
+  const userRoleRecs = await tx.query.userRoles.findMany({
+    where: inArray(
+      schema.userRoles.userId,
+      potentialManagers.map((e) => e.userId!)
+    ),
+    with: { role: true },
+  });
+  const rolesByUser: Record<string, string[]> = {};
+  for (const rec of userRoleRecs) {
+    if (!rolesByUser[rec.userId]) rolesByUser[rec.userId] = [];
+    rolesByUser[rec.userId].push(rec.role.name);
+  }
+
   // Filter suitable employees for product manager role
-  const productManagerCandidates = potentialManagers.filter(
-    (emp) =>
-      emp.positions?.title?.includes("Product") ||
-      emp.positions?.title?.includes("Manager") ||
-      emp.users?.role === "manager"
-  );
+  const productManagerCandidates = potentialManagers.filter((emp) => {
+    const userRoles = rolesByUser[emp.userId!] || [];
+    return (
+      emp.position?.title?.includes("Product") ||
+      emp.position?.title?.includes("Manager") ||
+      userRoles.some((r) => r.endsWith("Manager"))
+    );
+  });
 
   // Filter suitable employees for tech lead role
   const techLeadCandidates = potentialManagers.filter(
     (emp) =>
-      emp.positions?.title?.includes("Engineer") ||
-      emp.positions?.title?.includes("Lead") ||
-      emp.positions?.title?.includes("Architect")
+      emp.position?.title?.includes("Engineer") ||
+      emp.position?.title?.includes("Lead") ||
+      emp.position?.title?.includes("Architect")
   );
 
   for (let i = 0; i < finalProductNames.length; i++) {

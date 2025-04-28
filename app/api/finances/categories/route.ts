@@ -12,7 +12,7 @@ import { validateSession } from "@/lib/permission-handler";
 
 // GET /api/finances/categories - Get all transaction categories with optional filtering by type
 export async function GET(req: NextRequest) {
-  if (!(await validateSession("read_categories"))) {
+  if (!(await validateSession("finance", "read"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
 
 // POST /api/finances/categories - Create a new transaction category
 export async function POST(req: NextRequest) {
-  if (!(await validateSession("write_categories"))) {
+  if (!(await validateSession("finance", "write"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {

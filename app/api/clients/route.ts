@@ -6,7 +6,7 @@ import { PaginatedResponse } from "@/lib/types";
 import { validateSession } from "@/lib/permission-handler";
 
 export async function GET(request: NextRequest) {
-  if (!(await validateSession("read_clients"))) {
+  if (!(await validateSession("client", "read"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

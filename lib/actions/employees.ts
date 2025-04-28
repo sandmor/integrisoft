@@ -7,48 +7,20 @@ import {
   positions,
   users,
   accounts,
+  roles,
+  userRoles,
 } from "@/lib/db/schema";
-import { eq, and, desc, count, ilike, asc } from "drizzle-orm";
+import { eq, and, desc, count, ilike, asc, not, inArray } from "drizzle-orm";
 import { createId } from "@paralleldrive/cuid2";
 import { auth } from "@/lib/auth";
 import {
   GetEmployeesParams,
-  Employee,
   CreateEmployeeRequest,
   UpdateEmployeeRequest,
   EmployeeWithDetails,
+  Department,
+  Position,
 } from "../types/employees";
-
-// Department type
-export type Department = {
-  id: string;
-  name: string;
-};
-
-// Position type
-export type Position = {
-  id: string;
-  title: string;
-  departmentId?: string;
-};
-
-export type NewEmployeeData = {
-  name: string;
-  lastName: string;
-  email: string;
-  department?: string;
-  position?: string;
-  hireDate: Date;
-  salary?: string;
-  contactEmail?: string;
-  contactPhone?: string;
-};
-
-// New type for creating an employee with user account
-export type CreateEmployeeData = NewEmployeeData & {
-  password: string;
-  role?: "admin" | "manager" | "employee";
-};
 
 // Fetch all departments
 export async function getDepartments(): Promise<Department[]> {
@@ -86,7 +58,7 @@ export async function getPositions(departmentId?: string): Promise<Position[]> {
 }
 
 export async function getEmployees(options?: GetEmployeesParams): Promise<{
-  data: Employee[];
+  data: EmployeeWithDetails[];
   count: number;
 }> {
   const { page = 0, pageSize = 10, sorts = [], filters = [] } = options || {};
@@ -183,8 +155,7 @@ export async function getEmployees(options?: GetEmployeesParams): Promise<{
     }
   }
 
-  // Build the final query with all filters, sorts, and pagination
-  const finalQuery = db
+  const employeeRows = await db
     .select({
       id: employees.id,
       firstName: users.name,
@@ -196,7 +167,9 @@ export async function getEmployees(options?: GetEmployeesParams): Promise<{
       salary: employees.salary,
       contactEmail: employees.contactEmail,
       contactPhone: employees.contactPhone,
-      status: employees.isDeleted,
+      isDeleted: employees.isDeleted,
+      createdAt: employees.createdAt,
+      updatedAt: employees.updatedAt,
     })
     .from(employees)
     .leftJoin(users, eq(employees.userId, users.id))
@@ -207,23 +180,40 @@ export async function getEmployees(options?: GetEmployeesParams): Promise<{
     .limit(pageSize)
     .offset(page * pageSize);
 
-  // Execute the query
-  const results = await finalQuery;
+  // Extract employee IDs for roles lookup
+  const employeeIds = employeeRows.map((r) => r.id);
 
-  // Map the results to the Employee type
-  const data: Employee[] = results.map((employee) => ({
-    id: employee.id,
-    firstName: employee.firstName || "N/A",
-    lastName: employee.lastName || "N/A",
-    email: employee.email || "N/A",
-    department: employee.department || "",
-    position: employee.position || "",
-    hireDate: employee.hireDate.toISOString(),
-    status: employee.status ? "inactive" : "active",
-    // Include optional fields
-    userId: undefined, // Not exposed in API
-    createdAt: undefined,
-    updatedAt: undefined,
+  const roleRows = await db
+    .select({ userId: userRoles.userId, role: roles.name })
+    .from(userRoles)
+    .leftJoin(roles, eq(userRoles.roleId, roles.id))
+    .where(inArray(userRoles.userId, employeeIds));
+
+  // Group roles by userId
+  const rolesMap = new Map<string, string[]>();
+  for (const { userId, role } of roleRows) {
+    if (!rolesMap.has(userId)) rolesMap.set(userId, []);
+    if (role !== null) {
+      rolesMap.get(userId)!.push(role);
+    }
+  }
+
+  // Combine core employee data with roles
+  const data = employeeRows.map((row) => ({
+    id: row.id,
+    firstName: row.firstName || "N/A",
+    lastName: row.lastName || "N/A",
+    email: row.email || "N/A",
+    department: row.department || "",
+    position: row.position || "",
+    hireDate: row.hireDate.toISOString(),
+    salary: row.salary ?? undefined,
+    contactEmail: row.contactEmail ?? undefined,
+    contactPhone: row.contactPhone ?? undefined,
+    isDeleted: row.isDeleted,
+    roles: rolesMap.get(row.id) || [],
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   }));
 
   return {
@@ -235,37 +225,50 @@ export async function getEmployees(options?: GetEmployeesParams): Promise<{
 export async function getEmployeeById(
   id: string
 ): Promise<EmployeeWithDetails | null> {
-  const result = await db.query.employees.findFirst({
-    with: {
-      users: true,
-      departments: true,
-      positions: true,
-    },
-    where: (employees, { eq, and }) =>
-      and(eq(employees.id, id), eq(employees.isDeleted, false)),
-  });
+  const result = await db
+    .select({
+      id: employees.id,
+      firstName: users.name,
+      lastName: users.lastName,
+      email: users.email,
+      department: departments.name,
+      position: positions.title,
+      hireDate: employees.hireDate,
+      salary: employees.salary,
+      contactEmail: employees.contactEmail,
+      contactPhone: employees.contactPhone,
+      isDeleted: employees.isDeleted,
+      role: roles.name,
+      createdAt: employees.createdAt,
+      updatedAt: employees.updatedAt,
+    })
+    .from(employees)
+    .leftJoin(users, eq(employees.userId, users.id))
+    .leftJoin(departments, eq(employees.departmentId, departments.id))
+    .leftJoin(positions, eq(employees.positionId, positions.id))
+    .leftJoin(userRoles, eq(employees.userId, userRoles.userId))
+    .leftJoin(roles, eq(userRoles.roleId, roles.id))
+    .where(and(eq(employees.id, id), not(eq(employees.isDeleted, true))));
 
-  if (!result) return null;
+  if (result.length === 0) return null;
+  const employee = result[0];
+  const rolesList = result.map((r) => r.role).filter((r) => r !== null);
 
   return {
-    id: result.id,
-    firstName: result.users?.name || "N/A",
-    lastName: result.users?.lastName || "N/A",
-    email: result.users?.email || "N/A",
-    department: result.departments?.name || "",
-    position: result.positions?.title || "",
-    status: result.isDeleted
-      ? "inactive"
-      : ("active" as "active" | "inactive" | "on-leave"),
-    hireDate: result.hireDate.toISOString(),
-    userId: result.userId || undefined,
-    contactPhone: result.contactPhone || undefined,
-    contactEmail: result.contactEmail || undefined,
-    salary: result.salary || undefined,
-    role:
-      (result.users?.role as "admin" | "manager" | "employee") || "employee",
-    createdAt: result.createdAt?.toISOString(),
-    updatedAt: result.updatedAt?.toISOString(),
+    id: employee.id,
+    firstName: employee.firstName || "N/A",
+    lastName: employee.lastName || "N/A",
+    email: employee.email || "N/A",
+    department: employee.department || "",
+    position: employee.position || "",
+    isDeleted: employee.isDeleted,
+    hireDate: employee.hireDate.toISOString(),
+    contactPhone: employee.contactPhone ?? undefined,
+    contactEmail: employee.contactEmail ?? undefined,
+    salary: employee.salary ?? undefined,
+    roles: rolesList,
+    createdAt: employee.createdAt.toISOString(),
+    updatedAt: employee.updatedAt.toISOString(),
   };
 }
 
@@ -285,7 +288,6 @@ export async function createEmployee(
       email: data.email,
       name: data.firstName, // Map firstName to name
       lastName: data.lastName,
-      role: "employee", // Default role
       isActive: true,
       emailVerified: true, // Auto-verify for admin-created accounts
       createdAt: new Date(),
@@ -294,10 +296,7 @@ export async function createEmployee(
     });
 
     // Create account with password if needed
-    // (simplified for now, may need to be updated based on your auth implementation)
-    const hashedPassword = await authContext.password.hash(
-      "temporary-password"
-    );
+    const hashedPassword = await authContext.password.hash(data.password);
     await tx.insert(accounts).values({
       id: createId(),
       userId: userId,
@@ -360,95 +359,152 @@ export async function createEmployee(
       id: employeeId,
       userId: userId,
       hireDate: new Date(data.hireDate),
-      // Use isDeleted to track status
-      isDeleted: data.status === "inactive",
-      contactEmail: data.email,
+      isDeleted: false,
+      salary: data.salary,
+      contactEmail: data.contactEmail,
+      contactPhone: data.contactPhone,
       departmentId,
       positionId,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
+
+    // Get requested roles ids
+    const rolesQuery = await db
+      .select({
+        id: roles.id,
+        name: roles.name,
+      })
+      .from(roles)
+      .where(inArray(roles.name, data.roles));
+
+    const roleIds = rolesQuery.map((role) => role.id);
+    // Insert roles for the user
+    for (const roleId of roleIds) {
+      await tx.insert(userRoles).values({
+        userId: userId,
+        roleId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
   });
 
   return employeeId;
 }
 
 export async function updateEmployee(
-  id: string,
   data: UpdateEmployeeRequest
 ): Promise<string> {
-  // First, get the employee record to find the linked userId
-  const employeeRecord = await db.query.employees.findFirst({
-    where: (employees, { eq }) => eq(employees.id, id),
-    columns: {
-      userId: true,
-      departmentId: true,
-      positionId: true,
-    },
-  });
-
-  if (!employeeRecord) {
-    throw new Error("Employee not found");
-  }
-
   // Get auth context for password hashing if needed
   const authContext = await auth.$context;
 
-  // Start a transaction to update both user and employee records
-  await db.transaction(async (tx) => {
-    // Update the user record if userId exists
-    if (employeeRecord.userId) {
-      const userData: Record<string, any> = {
-        name: data.firstName,
-        lastName: data.lastName,
-        email: data.email,
-        updatedAt: new Date(),
-      };
+  // Fetch existing employee to get userId and current department/position
+  const employeeRecord = await db.query.employees.findFirst({
+    where: (employees, { eq }) => eq(employees.id, data.id),
+  });
+  if (!employeeRecord) throw new Error("Employee not found");
+  const userId = employeeRecord.userId!;
 
+  // Perform updates in a transaction
+  await db.transaction(async (tx) => {
+    // Update user record
+    const userUpdates: any = { updatedAt: new Date() };
+    if (data.firstName) userUpdates.name = data.firstName;
+    if (data.lastName) userUpdates.lastName = data.lastName;
+    if (data.email) userUpdates.email = data.email;
+    await tx.update(users).set(userUpdates).where(eq(users.id, userId));
+
+    // Update account credentials if email or password changed
+    if (data.email || data.password) {
+      const accountUpdates: any = { updatedAt: new Date() };
+      if (data.email) accountUpdates.accountId = data.email;
+      if (data.password) {
+        const hashed = await authContext.password.hash(data.password);
+        accountUpdates.password = hashed;
+      }
       await tx
-        .update(users)
-        .set(userData)
-        .where(eq(users.id, employeeRecord.userId));
+        .update(accounts)
+        .set(accountUpdates)
+        .where(
+          and(
+            eq(accounts.userId, userId),
+            eq(accounts.providerId, "credential")
+          )
+        );
     }
 
-    // Update department if provided
+    // Determine departmentId
     let departmentId = employeeRecord.departmentId;
     if (data.department) {
-      // Find the department by name
-      const departmentRecord = await tx.query.departments.findFirst({
-        where: (departments, { eq }) => eq(departments.name, data.department),
-        columns: { id: true },
+      const dept = await tx.query.departments.findFirst({
+        where: (departments, { eq }) => eq(departments.name, data.department!),
       });
-
-      departmentId = departmentRecord?.id || departmentId;
+      if (dept) departmentId = dept.id;
+      else {
+        const newDeptId = createId();
+        await tx.insert(departments).values({
+          id: newDeptId,
+          name: data.department,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          isDeleted: false,
+        });
+        departmentId = newDeptId;
+      }
     }
 
-    // Update position if provided
+    // Determine positionId
     let positionId = employeeRecord.positionId;
     if (data.position) {
-      // Find the position by title
-      const positionRecord = await tx.query.positions.findFirst({
-        where: (positions, { eq }) => eq(positions.title, data.position),
-        columns: { id: true },
+      const pos = await tx.query.positions.findFirst({
+        where: (positions, { eq }) => eq(positions.title, data.position!),
       });
-
-      positionId = positionRecord?.id || positionId;
+      if (pos) positionId = pos.id;
+      else {
+        const newPosId = createId();
+        await tx.insert(positions).values({
+          id: newPosId,
+          title: data.position,
+          departmentId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          isDeleted: false,
+        });
+        positionId = newPosId;
+      }
     }
 
-    // Update the employee record
-    await tx
-      .update(employees)
-      .set({
-        hireDate: new Date(data.hireDate),
-        isDeleted: data.status === "inactive",
-        departmentId,
-        positionId,
-        updatedAt: new Date(),
-      })
-      .where(eq(employees.id, id));
+    // Update employee record
+    const empUpdates: any = { updatedAt: new Date(), departmentId, positionId };
+    if (data.hireDate) empUpdates.hireDate = new Date(data.hireDate);
+    if (data.salary !== undefined) empUpdates.salary = data.salary;
+    if (data.contactEmail !== undefined)
+      empUpdates.contactEmail = data.contactEmail;
+    if (data.contactPhone !== undefined)
+      empUpdates.contactPhone = data.contactPhone;
+    await tx.update(employees).set(empUpdates).where(eq(employees.id, data.id));
+
+    // Update roles
+    if (data.roles) {
+      await tx.delete(userRoles).where(eq(userRoles.userId, userId));
+      const rolesQuery = await tx
+        .select({ id: roles.id })
+        .from(roles)
+        .where(inArray(roles.name, data.roles));
+      const roleIds = rolesQuery.map((r) => r.id);
+      for (const roleId of roleIds) {
+        await tx.insert(userRoles).values({
+          userId: userId,
+          roleId,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+    }
   });
 
-  return id;
+  return data.id;
 }
 
 export async function deleteEmployee(id: string): Promise<boolean> {
@@ -459,4 +515,13 @@ export async function deleteEmployee(id: string): Promise<boolean> {
     .where(eq(employees.id, id));
 
   return true;
+}
+
+// Fetch all roles
+export async function getRoles(): Promise<string[]> {
+  const result = await db.query.roles.findMany({
+    orderBy: (roles, { asc }) => [asc(roles.name)],
+  });
+
+  return result.map((role) => role.name);
 }

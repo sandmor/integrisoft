@@ -647,22 +647,22 @@ export async function generateActivities(
     const employee = await tx.query.employees.findFirst({
       where: eq(schema.employees.id, employeeId),
       with: {
-        users: true,
-        departments: true,
-        positions: true,
+        user: true,
+        department: true,
+        position: true,
       },
     });
 
-    if (employee && employee.users) {
-      const fullName = `${employee.users.name} ${employee.users.lastName}`;
+    if (employee && employee.user) {
+      const fullName = `${employee.user.name} ${employee.user.lastName}`;
 
       cache.employees.set(employeeId, {
         name: fullName,
-        department: employee.departments?.name || "Unknown Department",
-        position: employee.positions?.title || "Staff",
+        department: employee.department?.name || "Unknown Department",
+        position: employee.position?.title || "Staff",
       });
 
-      cache.users.set(employee.users.id, {
+      cache.users.set(employee.user.id, {
         name: fullName,
       });
     }

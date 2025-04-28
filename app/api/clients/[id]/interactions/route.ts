@@ -14,7 +14,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await validateSession("read_interactions"))) {
+  if (!(await validateSession("client", "read"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await params;
@@ -45,7 +45,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const userId = await validateSession("write_interactions");
+  const userId = await validateSession("client", "write");
 
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -21,15 +21,15 @@ export async function generateProjects(
   // Find project managers
   const employees = await tx.query.employees.findMany({
     with: {
-      positions: true,
+      position: true,
     },
   });
 
   // Find suitable project managers
   const projectManagers = employees.filter((employee) => {
-    if (!employee.positions) return false;
+    if (!employee.position) return false;
 
-    const position = employee.positions as { title?: string };
+    const position = employee.position as { title?: string };
     const title = position.title || "";
 
     return (

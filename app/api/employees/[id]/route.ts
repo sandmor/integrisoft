@@ -14,7 +14,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await validateSession("read_employees"))) {
+  if (!(await validateSession("user", "read"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await params;
@@ -46,7 +46,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await validateSession("write_employees"))) {
+  if (!(await validateSession("user", "write"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await params;
@@ -55,15 +55,18 @@ export async function PATCH(
     const data = (await req.json()) as UpdateEmployeeRequest;
     await tryCatch(
       () =>
-        updateEmployee(id, {
+        updateEmployee({
           firstName: data.firstName,
           lastName: data.lastName,
           email: data.email,
           position: data.position,
           department: data.department,
           hireDate: data.hireDate,
-          status: data.status,
-          userId: data.userId,
+          salary: data.salary,
+          contactEmail: data.contactEmail,
+          contactPhone: data.contactPhone,
+          roles: data.roles,
+          id,
         }),
       {
         customErrorMessage: "Failed to update employee",
@@ -91,7 +94,7 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await validateSession("write_employees"))) {
+  if (!(await validateSession("user", "write"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { id } = await params;

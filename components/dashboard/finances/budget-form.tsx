@@ -136,9 +136,11 @@ export function BudgetForm({
       }
       router.push("/dashboard/finances/budgets");
       router.refresh();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error("Something went wrong. Please try again.");
+      toast.error(
+        `Something went wrong: ${error.data?.error || error.message}`
+      );
     }
   }
 

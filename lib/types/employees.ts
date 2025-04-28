@@ -1,6 +1,3 @@
-// Shared types for employee-related operations between frontend and backend
-export type EmployeeStatus = "active" | "inactive" | "on-leave";
-
 // Employee entity type
 export interface Employee {
   id: string;
@@ -9,19 +6,18 @@ export interface Employee {
   email: string;
   position: string;
   department: string;
-  status: EmployeeStatus;
+  isDeleted: boolean;
   hireDate: string;
   userId?: string;
   createdAt?: string;
   updatedAt?: string;
   salary?: string;
-}
-
-export interface EmployeeWithDetails extends Employee {
   contactEmail?: string;
   contactPhone?: string;
-  role: "admin" | "manager" | "employee";
+  roles: string[];
 }
+
+export type EmployeeWithDetails = Employee; // Kept for backward compatibility
 
 // Query parameters for getEmployees
 export interface GetEmployeesParams {
@@ -29,30 +25,30 @@ export interface GetEmployeesParams {
   pageSize?: number;
   sorts?: Array<{ field: string; direction: "asc" | "desc" }>;
   filters?: Array<{ field: string; value: string }>;
-  status?: string;
-  department?: string;
 }
 
 // Employee creation request type
-export interface CreateEmployeeRequest {
-  firstName: string;
-  lastName: string;
-  email: string;
-  position: string;
-  department: string;
-  hireDate: string;
-  status: EmployeeStatus;
-  userId?: string;
-}
+export type CreateEmployeeRequest = Omit<
+  Employee,
+  "id" | "userId" | "isDeleted" | "createdAt" | "updatedAt"
+> & {
+  password: string;
+};
 
 // Employee update request type
-export interface UpdateEmployeeRequest {
-  firstName: string;
-  lastName: string;
-  email: string;
-  position: string;
-  department: string;
-  hireDate: string;
-  status: EmployeeStatus;
-  userId?: string;
-}
+export type UpdateEmployeeRequest = Partial<CreateEmployeeRequest> & {
+  id: string;
+};
+
+// Department type
+export type Department = {
+  id: string;
+  name: string;
+};
+
+// Position type
+export type Position = {
+  id: string;
+  title: string;
+  departmentId?: string;
+};

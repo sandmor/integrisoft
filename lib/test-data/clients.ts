@@ -35,20 +35,20 @@ export async function generateClients(
   // Find employees in sales department or with account management roles
   const employees = await tx.query.employees.findMany({
     with: {
-      positions: true,
-      departments: true,
+      position: true,
+      department: true,
     },
   });
 
   const accountManagers = employees.filter(
     (emp) =>
-      (emp.positions?.title?.toLowerCase().includes("account") &&
-        emp.positions?.title?.toLowerCase().includes("manager")) ||
-      (emp.positions?.title?.toLowerCase().includes("client") &&
-        emp.positions?.title?.toLowerCase().includes("success")) ||
-      (emp.positions?.title?.toLowerCase().includes("sales") &&
-        emp.positions?.title?.toLowerCase().includes("representative")) ||
-      emp.departments?.name === "Sales"
+      (emp.position?.title?.toLowerCase().includes("account") &&
+        emp.position?.title?.toLowerCase().includes("manager")) ||
+      (emp.position?.title?.toLowerCase().includes("client") &&
+        emp.position?.title?.toLowerCase().includes("success")) ||
+      (emp.position?.title?.toLowerCase().includes("sales") &&
+        emp.position?.title?.toLowerCase().includes("representative")) ||
+      emp.department?.name === "Sales"
   );
 
   // If no suitable account managers, use any employee

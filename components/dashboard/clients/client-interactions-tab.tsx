@@ -187,9 +187,11 @@ export function ClientInteractionsTab({
       toast.success("Interaction added successfully");
       form.reset();
       setIsAddingInteraction(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to add interaction:", error);
-      toast.error("Failed to add interaction. Please try again.");
+      toast.error(
+        `Failed to add interaction: ${error.data?.error || error.message}`
+      );
     }
   }
 
@@ -197,9 +199,11 @@ export function ClientInteractionsTab({
     try {
       await deleteInteraction({ interactionId, clientId }).unwrap();
       toast.success("Interaction deleted successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete interaction:", error);
-      toast.error("Failed to delete interaction. Please try again.");
+      toast.error(
+        `Failed to delete interaction: ${error.data?.error || error.message}`
+      );
     }
   }
 

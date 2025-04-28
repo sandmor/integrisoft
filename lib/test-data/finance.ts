@@ -1090,6 +1090,42 @@ export async function generateTransactions(
           project.id
         );
       }
+
+      // Milestone-based revenue transactions
+      const projectMilestones = await tx.query.milestones.findMany({
+        where: eq(schema.milestones.projectId, project.id),
+      });
+      for (const milestone of projectMilestones) {
+        if (milestone.completedDate) {
+          const milestonePayment =
+            project.budget * 0.05 * (0.8 + Math.random() * 0.4);
+          await createTransaction(
+            "income",
+            new Date(milestone.completedDate),
+            milestonePayment,
+            `Milestone payment: ${project.name} - ${milestone.name}`,
+            clientPaymentCat?.id || null,
+            null,
+            project.id
+          );
+        }
+      }
+
+      // Occasional project delivery expenses
+      if (equipmentCat && Math.random() < 0.5) {
+        const deliveryCost = project.budget * 0.1 * (0.9 + Math.random() * 0.2);
+        const randomMonth =
+          projectMonths[Math.floor(Math.random() * projectMonths.length)];
+        await createTransaction(
+          "expense",
+          new Date(randomMonth.getFullYear(), randomMonth.getMonth(), 15),
+          deliveryCost,
+          `Delivery cost for project: ${project.name}`,
+          equipmentCat.id,
+          null,
+          project.id
+        );
+      }
     }
 
     // Client payments for projects with clients (income)

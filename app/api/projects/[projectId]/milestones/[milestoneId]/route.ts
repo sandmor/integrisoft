@@ -2,18 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { milestones } from "@/lib/db/schema";
 import { eq, and, not } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { validateSession } from "@/lib/permission-handler";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { Milestone, MilestoneUpdateInput } from "@/lib/types";
-import { validateSession } from "@/lib/permission-handler";
 
 // GET /api/projects/[projectId]/milestones/[milestoneId] - Get a single milestone by ID
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string; milestoneId: string }> }
 ) {
-  if (!(await validateSession("read_projects"))) {
+  if (!(await validateSession("project", "read"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { projectId, milestoneId } = await params;
@@ -61,7 +60,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string; milestoneId: string }> }
 ) {
-  if (!(await validateSession("write_projects"))) {
+  if (!(await validateSession("project", "write"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { projectId, milestoneId } = await params;
@@ -140,7 +139,7 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string; milestoneId: string }> }
 ) {
-  if (!(await validateSession("write_projects"))) {
+  if (!(await validateSession("project", "write"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {

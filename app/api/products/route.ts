@@ -5,7 +5,7 @@ import { GetProductsParams, CreateProductRequest } from "@/lib/types/products";
 import { validateSession } from "@/lib/permission-handler";
 
 export async function GET(request: NextRequest) {
-  if (!(await validateSession("read_products"))) {
+  if (!(await validateSession("product", "read"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const url = request.nextUrl;
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!(await validateSession("write_products"))) {
+  if (!(await validateSession("product", "write"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const body = (await request.json()) as CreateProductRequest;

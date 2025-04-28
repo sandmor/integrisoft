@@ -12,18 +12,12 @@ import {
   pgEnum,
   AnyPgColumn,
   primaryKey,
+  index,
 } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
 import { relations } from "drizzle-orm";
 
 // ==================== ENUMS ====================
-
-// User role enum
-export const userRoleEnum = pgEnum("user_role", [
-  "admin",
-  "manager",
-  "employee",
-]);
 
 // Project status enum
 export const projectStatusEnum = pgEnum("project_status", [
@@ -57,6 +51,22 @@ export const transactionTypeEnum = pgEnum("transaction_type", [
   "transfer",
 ]);
 
+export const moduleTypeEnum = pgEnum("module_type", [
+  "user",
+  "project",
+  "finance",
+  "product",
+  "client",
+  "reporting",
+  "admin",
+]);
+
+export const accessLevelEnum = pgEnum("access_level", [
+  "read", // Read-only access
+  "write", // Read and write access
+  "admin", // Administrative access, can manage users and settings
+]);
+
 // ==================== USERS AND AUTHENTICATION ====================
 
 // Users table
@@ -69,7 +79,6 @@ export const users = pgTable("users", {
   emailVerified: boolean("email_verified").notNull().default(false),
   name: text("name").notNull(),
   lastName: varchar("last_name", { length: 100 }).notNull(),
-  role: userRoleEnum("role").notNull().default("employee"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
@@ -135,35 +144,70 @@ export const permissions = pgTable("permissions", {
     .primaryKey()
     .notNull()
     .$defaultFn(() => createId()),
-  name: varchar("name", { length: 100 }).notNull().unique(),
-  description: text("description"),
+  module: moduleTypeEnum("module").notNull(),
+  accessLevel: accessLevelEnum("access_level").notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });
 
-// Role permissions mapping
-export const rolePermissions = pgTable(
-  "role_permissions",
+// Roles table
+export const roles = pgTable(
+  "roles",
   {
     id: text("id")
       .primaryKey()
       .notNull()
       .$defaultFn(() => createId()),
-    role: userRoleEnum("role").notNull(),
-    permissionId: text("permission_id")
-      .notNull()
-      .references(() => permissions.id),
+    name: varchar("name", { length: 100 }).notNull().unique(),
+    description: text("description"),
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   },
-  (table) => {
-    return {
-      rolePermissionUnique: uniqueIndex("role_permission_unique_idx").on(
-        table.role,
-        table.permissionId
-      ),
-    };
-  }
+  (table) => [uniqueIndex("roles_name_unique_idx").on(table.name)]
+);
+
+// Role permissions junction table
+export const rolePermissions = pgTable(
+  "role_permissions",
+  {
+    roleId: text("role_id")
+      .notNull()
+      .references(() => roles.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    permissionId: text("permission_id")
+      .notNull()
+      .references(() => permissions.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.roleId, table.permissionId] })]
+);
+
+// User roles junction table
+export const userRoles = pgTable(
+  "user_roles",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    roleId: text("role_id")
+      .notNull()
+      .references(() => roles.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.roleId] })]
 );
 
 // ==================== EMPLOYEES ====================
@@ -236,33 +280,28 @@ export const employees = pgTable("employees", {
   isDeleted: boolean("is_deleted").notNull().default(false),
 });
 
-// Employee skills mapping
+// Employee skills junction table
 export const employeeSkills = pgTable(
   "employee_skills",
   {
-    id: text("id")
-      .primaryKey()
-      .notNull()
-      .$defaultFn(() => createId()),
     employeeId: text("employee_id")
       .notNull()
-      .references(() => employees.id),
+      .references(() => employees.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
     skillId: text("skill_id")
       .notNull()
-      .references(() => skills.id),
+      .references(() => skills.id, {
+        onDelete: "cascade",
+        onUpdate: "cascade",
+      }),
     proficiencyLevel: integer("proficiency_level").notNull().default(1), // 1-5 scale
     yearsExperience: decimal("years_experience", { precision: 4, scale: 1 }),
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
   },
-  (table) => {
-    return {
-      employeeSkillUnique: uniqueIndex("employee_skill_unique_idx").on(
-        table.employeeId,
-        table.skillId
-      ),
-    };
-  }
+  (table) => [primaryKey({ columns: [table.employeeId, table.skillId] })]
 );
 
 // ==================== FINANCE ====================
@@ -461,49 +500,57 @@ export const projects = pgTable("projects", {
 });
 
 // Project milestones
-export const milestones = pgTable("milestones", {
-  id: text("id")
-    .primaryKey()
-    .notNull()
-    .$defaultFn(() => createId()),
-  projectId: text("project_id")
-    .notNull()
-    .references(() => projects.id),
-  name: varchar("name", { length: 100 }).notNull(),
-  description: text("description"),
-  dueDate: date("due_date", { mode: "date" }).notNull(),
-  completedDate: date("completed_date", { mode: "date" }),
-  isCompleted: boolean("is_completed").notNull().default(false),
-  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
-  isDeleted: boolean("is_deleted").notNull().default(false),
-});
+export const milestones = pgTable(
+  "milestones",
+  {
+    id: text("id")
+      .primaryKey()
+      .notNull()
+      .$defaultFn(() => createId()),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id),
+    name: varchar("name", { length: 100 }).notNull(),
+    description: text("description"),
+    dueDate: date("due_date", { mode: "date" }).notNull(),
+    completedDate: date("completed_date", { mode: "date" }),
+    isCompleted: boolean("is_completed").notNull().default(false),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+    isDeleted: boolean("is_deleted").notNull().default(false),
+  },
+  (table) => [index("milestone_project_id_idx").on(table.projectId)]
+);
 
 // Project tasks
-export const tasks = pgTable("tasks", {
-  id: text("id")
-    .primaryKey()
-    .notNull()
-    .$defaultFn(() => createId()),
-  projectId: text("project_id")
-    .notNull()
-    .references(() => projects.id),
-  milestoneId: text("milestone_id").references(() => milestones.id),
-  title: varchar("title", { length: 200 }).notNull(),
-  description: text("description"),
-  status: taskStatusEnum("status").notNull().default("todo"),
-  priority: integer("priority").notNull().default(2), // 1=low, 2=medium, 3=high
-  assignedToId: text("assigned_to_id").references(() => employees.id),
-  createdById: text("created_by_id").references(() => users.id),
-  estimatedHours: decimal("estimated_hours", { precision: 6, scale: 2 }),
-  actualHours: decimal("actual_hours", { precision: 6, scale: 2 }),
-  dueDate: date("due_date", { mode: "date" }),
-  startDate: date("start_date", { mode: "date" }),
-  completedDate: date("completed_date", { mode: "date" }),
-  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
-  isDeleted: boolean("is_deleted").notNull().default(false),
-});
+export const tasks = pgTable(
+  "tasks",
+  {
+    id: text("id")
+      .primaryKey()
+      .notNull()
+      .$defaultFn(() => createId()),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id),
+    milestoneId: text("milestone_id").references(() => milestones.id),
+    title: varchar("title", { length: 200 }).notNull(),
+    description: text("description"),
+    status: taskStatusEnum("status").notNull().default("todo"),
+    priority: integer("priority").notNull().default(2), // 1=low, 2=medium, 3=high
+    assignedToId: text("assigned_to_id").references(() => employees.id),
+    createdById: text("created_by_id").references(() => users.id),
+    estimatedHours: decimal("estimated_hours", { precision: 6, scale: 2 }),
+    actualHours: decimal("actual_hours", { precision: 6, scale: 2 }),
+    dueDate: date("due_date", { mode: "date" }),
+    startDate: date("start_date", { mode: "date" }),
+    completedDate: date("completed_date", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+    isDeleted: boolean("is_deleted").notNull().default(false),
+  },
+  (table) => [index("task_project_id_idx").on(table.projectId)]
+);
 
 // Kanban board task ordering
 export const kanbanBoardOrder = pgTable(
@@ -787,27 +834,53 @@ export const systemSettings = pgTable("system_settings", {
   updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
 });
 
-export const usersRelations = relations(users, ({ one }) => ({
-  employees: one(employees, {
+export const usersRelations = relations(users, ({ one, many }) => ({
+  employee: one(employees, {
     fields: [users.id],
     references: [employees.userId],
   }),
+  roles: many(userRoles),
 }));
 
 export const employeesRelations = relations(employees, ({ one }) => ({
-  users: one(users, {
+  user: one(users, {
     fields: [employees.userId],
     references: [users.id],
   }),
-  departments: one(departments, {
+  department: one(departments, {
     fields: [employees.departmentId],
     references: [departments.id],
   }),
-  positions: one(positions, {
+  position: one(positions, {
     fields: [employees.positionId],
     references: [positions.id],
   }),
 }));
+
+export const userRolesRelations = relations(userRoles, ({ one }) => ({
+  user: one(users, {
+    fields: [userRoles.userId],
+    references: [users.id],
+  }),
+  role: one(roles, {
+    fields: [userRoles.roleId],
+    references: [roles.id],
+  }),
+}));
+
+export const rolePermissionsRelations = relations(
+  rolePermissions,
+  ({ one }) => ({
+    role: one(roles, {
+      fields: [rolePermissions.roleId],
+      references: [roles.id],
+    }),
+    permission: one(permissions, {
+      fields: [rolePermissions.permissionId],
+      references: [permissions.id],
+    }),
+  })
+);
 
 export const departmentsRelations = relations(departments, ({ one }) => ({
   manager: one(employees, {

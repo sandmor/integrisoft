@@ -123,24 +123,26 @@ export async function generateNotifications(
     })
     .execute();
 
-  // Generate 10-50 notifications for each user
+  // Generate notifications for each user
   for (const userId of userIds) {
     // Get user info for personalized notifications
     const user = await tx.query.users
-      .findFirst({
-        where: eq(schema.users.id, userId),
-      })
+      .findFirst({ where: eq(schema.users.id, userId) })
       .execute();
-
     if (!user || user.isDeleted) continue;
+    // Fetch assigned roles for this user
+    const userRoleRecs = await tx.query.userRoles.findMany({
+      where: eq(schema.userRoles.userId, userId),
+      with: { role: true },
+    });
+    const roleNames = userRoleRecs.map((ur) => ur.role.name);
 
-    // Number of notifications depends on user activity (more for admins and managers)
-    const notificationCount =
-      user.role === "admin"
-        ? 30 + Math.floor(Math.random() * 21)
-        : user.role === "manager"
-        ? 20 + Math.floor(Math.random() * 16)
-        : 10 + Math.floor(Math.random() * 11);
+    // Number of notifications depends on user activity
+    const notificationCount = roleNames.includes("Admin")
+      ? 30 + Math.floor(Math.random() * 21)
+      : roleNames.some((r) => r.endsWith("Manager"))
+      ? 20 + Math.floor(Math.random() * 16)
+      : 10 + Math.floor(Math.random() * 11);
 
     // Time range for notifications - most from the last 30 days,
     // but some older ones to simulate history

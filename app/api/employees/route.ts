@@ -15,7 +15,7 @@ import { revalidatePath } from "next/cache";
 import { validateSession } from "@/lib/permission-handler";
 
 export async function GET(request: NextRequest) {
-  if (!(await validateSession("read_employees"))) {
+  if (!(await validateSession("user", "read"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
 
 // POST /api/employees - Create a new employee
 export async function POST(req: NextRequest) {
-  if (!(await validateSession("write_employees"))) {
+  if (!(await validateSession("user", "write"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -97,8 +97,11 @@ export async function POST(req: NextRequest) {
           position: data.position,
           department: data.department,
           hireDate: data.hireDate,
-          status: data.status,
-          userId: data.userId,
+          password: data.password,
+          salary: data.salary,
+          contactEmail: data.contactEmail,
+          contactPhone: data.contactPhone,
+          roles: data.roles,
         }),
       {
         customErrorMessage: "Failed to create employee",

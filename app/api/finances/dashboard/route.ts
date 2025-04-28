@@ -1,31 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import {
-  transactions,
-  budgets,
-  costCenters,
-  transactionCategories,
-} from "@/lib/db/schema";
-import {
-  desc,
-  eq,
-  and,
-  count,
-  sum,
-  between,
-  sql,
-  isNotNull,
-} from "drizzle-orm";
+import { transactions, budgets, costCenters } from "@/lib/db/schema";
+import { desc, eq, and, count, between, sql, isNotNull } from "drizzle-orm";
 import { FinancialDashboardResponse } from "@/lib/types";
 import { validateSession } from "@/lib/permission-handler";
 
-// Get financial dashboard data
-export async function GET() {
-  if (!(await validateSession("read_financial_dashboard"))) {
-    return NextResponse.json(
-      { success: false, error: "Unauthorized" },
-      { status: 401 }
-    );
+// GET /api/finances/dashboard - Get financial dashboard data
+export async function GET(req: NextRequest) {
+  if (!(await validateSession("finance", "read"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
     const currentDate = new Date();

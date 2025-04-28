@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
 import { useDeleteCostCenterMutation } from "@/lib/redux/financesApi";
+import { toast } from "sonner";
 import {
   Card,
   CardHeader,
@@ -51,9 +52,12 @@ export default function CostCenterDetailsClient({
   const handleDelete = async () => {
     try {
       await deleteCostCenter(costCenter.id).unwrap();
+      toast.success("Cost center deleted successfully");
       router.push("/dashboard/finances/cost-centers");
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      toast.error(
+        `Failed to delete cost center: ${e.data?.error || e.message}`
+      );
     }
   };
 

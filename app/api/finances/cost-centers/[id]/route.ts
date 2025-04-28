@@ -19,7 +19,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await validateSession("read_cost_centers"))) {
+  if (!(await validateSession("finance", "read"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
@@ -49,7 +49,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await validateSession("write_cost_centers"))) {
+  if (!(await validateSession("finance", "write"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
@@ -173,7 +173,7 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await validateSession("write_cost_centers"))) {
+  if (!(await validateSession("finance", "write"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {

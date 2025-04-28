@@ -381,7 +381,7 @@ export async function getBudgetById(id: string): Promise<BudgetDetail | null> {
       eq(transactions.categoryId, transactionCategories.id)
     )
     .where(topExpenseCategoriesCondition)
-    .groupBy(transactions.categoryId)
+    .groupBy(transactionCategories.id, transactionCategories.name)
     .orderBy(sql`SUM(${transactions.amount})`)
     .limit(5);
 

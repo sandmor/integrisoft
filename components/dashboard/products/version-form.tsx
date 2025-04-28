@@ -59,9 +59,8 @@ export function VersionForm({ productId }: VersionFormProps) {
     try {
       await addVersion({ ...values, productId }).unwrap();
       toast.success("Version added");
-      form.reset();
-    } catch (e) {
-      toast.error("Failed to add version");
+    } catch (e: any) {
+      toast.error(`Failed to add version: ${e.data?.error || e.message}`);
     }
   }
 

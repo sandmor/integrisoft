@@ -25,21 +25,20 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { toast } from "sonner";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
 import { Combobox, ComboboxOption } from "@/components/ui/combobox";
 import {
   useAddEmployeeMutation,
   useUpdateEmployeeMutation,
 } from "@/lib/redux/employeesApi";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
-import { Department, Position } from "@/lib/actions/employees";
-import { EmployeeWithDetails } from "@/lib/types/employees";
+import {
+  CreateEmployeeRequest,
+  Department,
+  EmployeeWithDetails,
+  Position,
+} from "@/lib/types/employees";
 
 // Base validation schema for employee form (without password validation)
 const baseEmployeeSchema = z.object({
@@ -66,7 +65,7 @@ const baseEmployeeSchema = z.object({
     .optional()
     .or(z.literal("")),
   contactPhone: z.string().optional(),
-  role: z.enum(["admin", "manager", "employee"]),
+  roles: z.array(z.string()).optional(),
   password: z.string().optional(),
   confirmPassword: z.string().optional(),
 });
@@ -120,7 +119,7 @@ const newEmployeeSchema = z
       .optional()
       .or(z.literal("")),
     contactPhone: z.string().optional(),
-    role: z.enum(["admin", "manager", "employee"]),
+    roles: z.array(z.string()).min(1, { message: "Select at least one role." }),
     password: z.string().min(8, {
       message: "Password must be at least 8 characters.",
     }),
@@ -138,6 +137,7 @@ interface UnifiedEmployeeFormProps {
   initialData?: EmployeeWithDetails;
   departments: Department[];
   positions: Position[];
+  roles: string[];
   isSubmitting?: boolean;
   isEditing?: boolean;
 }
@@ -171,6 +171,7 @@ export function EmployeeForm({
   initialData,
   departments,
   positions,
+  roles: availableRoles,
   isSubmitting = false,
   isEditing = false,
 }: UnifiedEmployeeFormProps) {
@@ -257,7 +258,7 @@ export function EmployeeForm({
     salary: initialData?.salary?.toString() || "",
     contactEmail: initialData?.contactEmail || "",
     contactPhone: initialData?.contactPhone || "",
-    role: "employee",
+    roles: initialData?.roles || [],
     password: "",
     confirmPassword: "",
   };
@@ -282,15 +283,9 @@ export function EmployeeForm({
         form.setValue("positionId", initialPositionId);
       }
 
-      // For existing employees, set the role if available
+      // For existing employees, set the roles if available
       if (isEditing && initialData) {
-        const existingRole =
-          initialData.role === "admin" ||
-          initialData.role === "manager" ||
-          initialData.role === "employee"
-            ? initialData.role
-            : "employee";
-        form.setValue("role", existingRole);
+        form.setValue("roles", initialData.roles || []);
       }
     }
   }, [
@@ -324,8 +319,8 @@ export function EmployeeForm({
       );
       const selectedPosition = positions.find((p) => p.id === data.positionId);
 
-      // Convert form data to expected format
-      const employeeData = {
+      // Prepare full payload
+      const fullData: Partial<CreateEmployeeRequest> = {
         firstName: data.firstName,
         lastName: data.lastName,
         email: data.email,
@@ -335,9 +330,45 @@ export function EmployeeForm({
         salary: data.salary,
         contactEmail: data.contactEmail || undefined,
         contactPhone: data.contactPhone || undefined,
-        password: data.password || "", // Empty string will be handled by server
-        role: data.role,
+        roles: data.roles,
+        password: data.password || undefined,
       };
+
+      let employeeData: Partial<CreateEmployeeRequest>;
+      if (isEditing && initialData) {
+        // Only include fields that have changed
+        employeeData = { ...fullData };
+        // Omit password if not provided
+        if (!data.password) delete employeeData.password;
+        // Remove unchanged fields
+        if (data.firstName === initialData.firstName)
+          delete employeeData.firstName;
+        if (data.lastName === initialData.lastName)
+          delete employeeData.lastName;
+        if (data.email === initialData.email) delete employeeData.email;
+        if (selectedDepartment?.name === initialData.department)
+          delete employeeData.department;
+        if (selectedPosition?.title === initialData.position)
+          delete employeeData.position;
+        if (data.hireDate.toISOString() === initialData.hireDate)
+          delete employeeData.hireDate;
+        if (data.salary === initialData.salary) delete employeeData.salary;
+        if ((data.contactEmail || undefined) === initialData.contactEmail)
+          delete employeeData.contactEmail;
+        if ((data.contactPhone || undefined) === initialData.contactPhone)
+          delete employeeData.contactPhone;
+        // Compare roles arrays
+        const initialRoles = initialData.roles || [];
+        const newRoles = data.roles || [];
+        if (
+          initialRoles.length === newRoles.length &&
+          initialRoles.every((r, i) => r === newRoles[i])
+        ) {
+          delete employeeData.roles;
+        }
+      } else {
+        employeeData = fullData;
+      }
 
       if (isEditing && initialData) {
         await updateEmployee({
@@ -345,7 +376,7 @@ export function EmployeeForm({
           employee: employeeData,
         }).unwrap();
       } else {
-        await addEmployee(employeeData).unwrap();
+        await addEmployee(employeeData as CreateEmployeeRequest).unwrap();
       }
 
       toast.success(
@@ -632,28 +663,35 @@ export function EmployeeForm({
             </div>
           </div>
 
+          {/* Roles selection */}
           <div className="space-y-2">
-            <label htmlFor="role" className="text-sm font-medium">
-              User Role
-            </label>
-            <Select
-              defaultValue={form.getValues("role")}
-              onValueChange={(value) =>
-                form.setValue("role", value as "admin" | "manager" | "employee")
-              }
-            >
-              <SelectTrigger id="role" className="w-full">
-                <SelectValue placeholder="Select a role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="admin">Administrator</SelectItem>
-                <SelectItem value="manager">Manager</SelectItem>
-                <SelectItem value="employee">Employee</SelectItem>
-              </SelectContent>
-            </Select>
-            {form.formState.errors.role && (
+            <label className="text-sm font-medium">Roles</label>
+            <ScrollArea className="h-48 rounded border">
+              <div className="flex flex-col space-y-2 p-2">
+                {availableRoles.map((role) => (
+                  <div key={role} className="flex items-center">
+                    <Checkbox
+                      checked={form.watch("roles")?.includes(role) ?? false}
+                      onCheckedChange={(checked) => {
+                        const current = form.getValues("roles") || [];
+                        if (checked) {
+                          form.setValue("roles", [...current, role]);
+                        } else {
+                          form.setValue(
+                            "roles",
+                            current.filter((r) => r !== role)
+                          );
+                        }
+                      }}
+                    />
+                    <span className="ml-2 capitalize">{role}</span>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+            {form.formState.errors.roles && (
               <p className="text-sm text-red-500">
-                {form.formState.errors.role.message}
+                {form.formState.errors.roles.message}
               </p>
             )}
           </div>

@@ -4,6 +4,7 @@ import {
   getEmployeeById,
   getDepartments,
   getPositions,
+  getRoles,
 } from "@/lib/actions/employees";
 import { EmployeeForm } from "../../../../../components/dashboard/employees/employee-form";
 import { Button } from "@/components/ui/button";
@@ -15,10 +16,11 @@ export default async function EditEmployeePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [employee, departments, positions] = await Promise.all([
+  const [employee, departments, positions, roles] = await Promise.all([
     getEmployeeById(id),
     getDepartments(),
     getPositions(),
+    getRoles(),
   ]);
 
   if (!employee) {
@@ -51,6 +53,7 @@ export default async function EditEmployeePage({
         initialData={employee}
         departments={departments}
         positions={positions}
+        roles={roles}
         isEditing={true}
       />
     </div>

@@ -369,7 +369,7 @@ export async function getProjectsList({
       updatedAt: projects.updatedAt,
     })
     .from(projects)
-    .where(and(...conditions))
+    .where(and(...conditions, not(eq(tasks.isDeleted, true))))
     .limit(pageSize)
     .offset(page * pageSize)
     .orderBy(

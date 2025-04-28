@@ -83,16 +83,17 @@ export function ProductForm({ product, employees }: ProductFormProps) {
       if (isEditing && product) {
         await updateProduct({ id: product.id, product: data }).unwrap();
         toast.success("Product updated successfully");
-        router.push(`/dashboard/products/${product.id}`);
       } else {
         const result = await addProduct(data).unwrap();
         toast.success("Product created successfully");
         if (result?.id) router.push(`/dashboard/products/${result.id}`);
         else router.push("/dashboard/products");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to save product:", error);
-      toast.error("Failed to save product. Please try again.");
+      toast.error(
+        `Failed to save product: ${error.data?.error || error.message}`
+      );
     }
   }
 

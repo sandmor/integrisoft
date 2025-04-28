@@ -158,6 +158,7 @@ export async function getClientById(id: string) {
       accountManager: {
         id: employees.id,
         name: users.name,
+        lastName: users.lastName,
       },
     })
     .from(clients)
@@ -245,6 +246,10 @@ export async function getClientById(id: string) {
   // Return the client with related data
   return {
     ...client,
+    accountManager: {
+      id: client.accountManagerId,
+      name: `${client.accountManager.name} ${client.accountManager.lastName}`,
+    },
     contacts,
     projects: clientProjects.map((project) => ({
       ...project,
@@ -279,13 +284,17 @@ export async function getAccountManagers() {
     .select({
       id: employees.id,
       name: users.name,
+      lastName: users.lastName,
     })
     .from(employees)
     .innerJoin(users, eq(employees.userId, users.id))
     .where(and(eq(employees.isDeleted, false), eq(users.isActive, true)))
     .orderBy(users.name);
 
-  return managers;
+  return managers.map((manager) => ({
+    id: manager.id,
+    name: `${manager.name} ${manager.lastName}`,
+  }));
 }
 
 export async function addClientContact(

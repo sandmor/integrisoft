@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
 import { useDeleteBudgetMutation } from "@/lib/redux/financesApi";
+import { toast } from "sonner";
 import {
   Card,
   CardHeader,
@@ -46,8 +47,13 @@ export default function BudgetDetailsClient({
   const [deleteBudget, { isLoading: isDeleting }] = useDeleteBudgetMutation();
 
   const handleDelete = async () => {
-    await deleteBudget(budget.id).unwrap();
-    router.push("/dashboard/finances/budgets");
+    try {
+      await deleteBudget(budget.id).unwrap();
+      toast.success("Budget deleted successfully");
+      router.push("/dashboard/finances/budgets");
+    } catch (e: any) {
+      toast.error(`Failed to delete budget. ${e.data?.error || e.message}`);
+    }
   };
 
   const fmtDate = (s: string) => format(new Date(s), "PPP");

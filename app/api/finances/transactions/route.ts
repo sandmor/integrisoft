@@ -37,9 +37,9 @@ import {
 import { getTransactionList } from "@/lib/actions/finances";
 import { validateSession } from "@/lib/permission-handler";
 
-// GET /api/finances/transactions - Get all transactions with filtering, sorting and pagination
+// GET /api/finances/transactions - Get all transactions with filtering, sorting, and pagination
 export async function GET(req: NextRequest) {
-  if (!(await validateSession("read_transactions"))) {
+  if (!(await validateSession("finance", "read"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
 
 // POST /api/finances/transactions - Create a new transaction
 export async function POST(req: NextRequest) {
-  const userId = await validateSession("write_transactions");
+  const userId = await validateSession("finance", "write");
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -114,6 +114,8 @@ export async function POST(req: NextRequest) {
         isDeleted: false,
       })
       .returning();
+
+    console.log("Transaction created:", transaction);
 
     // Fetch the complete transaction with related data
     const completeTransaction = await db

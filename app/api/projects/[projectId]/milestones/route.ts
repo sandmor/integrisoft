@@ -10,7 +10,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
-  if (!(await validateSession("read_projects"))) {
+  if (!(await validateSession("project", "read"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { projectId } = await params;
@@ -26,7 +26,8 @@ export async function GET(
 
     // Get all milestones for this project
     const projectMilestones = await db.query.milestones.findMany({
-      where: (milestone, { eq }) => eq(milestone.projectId, projectId),
+      where: (milestone, { eq, and }) =>
+        and(eq(milestone.projectId, projectId), eq(milestone.isDeleted, false)),
       orderBy: (milestone, { asc }) => [asc(milestone.dueDate)],
     });
 
@@ -59,7 +60,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
-  if (!(await validateSession("write_projects"))) {
+  if (!(await validateSession("project", "write"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const { projectId } = await params;

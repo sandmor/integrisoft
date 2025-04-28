@@ -34,6 +34,8 @@ export default async function EmployeePage({
     notFound();
   }
 
+  console.log("Employee data:", employee);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -146,7 +148,6 @@ export default async function EmployeePage({
               </div>
             </div>
 
-            {/* Placeholder for Skills section - to be implemented */}
             <div>
               <h4 className="font-semibold mb-2">Skills and Competencies</h4>
               <p className="text-muted-foreground text-sm">
@@ -154,7 +155,6 @@ export default async function EmployeePage({
               </p>
             </div>
 
-            {/* Placeholder for Project assignments - to be implemented */}
             <div>
               <h4 className="font-semibold mb-2">Project Assignments</h4>
               <p className="text-muted-foreground text-sm">

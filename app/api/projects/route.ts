@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { projects } from "@/lib/db/schema";
-import { ProjectCreateInput } from "@/lib/types";
-import { getProjectsList } from "@/lib/actions/projects";
 import { validateSession } from "@/lib/permission-handler";
+import { getProjectsList } from "@/lib/actions/projects";
+import { ProjectCreateInput } from "@/lib/types";
+import { projects } from "@/lib/db/schema";
 
-// GET /api/projects - List all projects with pagination, sorting, filtering
-export async function GET(req: NextRequest) {
-  if (!(await validateSession("read_projects"))) {
+// GET /api/projects - get all projects (with pagination, filtering, sorting)
+export async function GET(request: NextRequest) {
+  if (!(await validateSession("project", "read"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
     // Get query parameters
-    const searchParams = req.nextUrl.searchParams;
+    const searchParams = request.nextUrl.searchParams;
     const page = parseInt(searchParams.get("page") || "0");
     const pageSize = parseInt(searchParams.get("pageSize") || "10");
     const sorts = searchParams.getAll("sorts");
@@ -38,12 +38,14 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/projects - Create a new project
+// POST /api/projects - create a new project
 export async function POST(req: NextRequest) {
-  const userId = await validateSession("write_projects");
+  const userId = await validateSession("project", "write");
+
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
   try {
     const data: ProjectCreateInput = await req.json();
 

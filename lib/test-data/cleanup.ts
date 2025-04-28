@@ -35,7 +35,9 @@ export async function clearAllData(
   await tx.delete(schema.skills).execute();
   await tx.delete(schema.positions).execute();
   await tx.delete(schema.departments).execute();
+  await tx.delete(schema.userRoles).execute();
   await tx.delete(schema.rolePermissions).execute();
+  await tx.delete(schema.roles).execute();
   await tx.delete(schema.permissions).execute();
   await tx.delete(schema.verifications).execute();
   await tx.delete(schema.accounts).execute();

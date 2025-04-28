@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   useUpdateCostCenterMutation,
   useCreateCostCenterMutation,
 } from "@/lib/redux/financesApi";
+import { toast } from "sonner";
 import {
   Card,
   CardHeader,
@@ -37,55 +40,62 @@ export default function CostCenterFormClient({
   const [createCostCenter, { isLoading: isCreating }] =
     useCreateCostCenterMutation();
 
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [budget, setBudget] = useState<string>("");
-  const [error, setError] = useState<string | null>(null);
+  const isLoading = isCreating || isSaving;
 
-  useEffect(() => {
-    if (costCenter && !isNew) {
-      setName(costCenter.name || "");
-      setDescription(costCenter.description || "");
-      setBudget(costCenter.budget || "");
-    }
-  }, [costCenter, isNew]);
+  // Define Zod schema for form validation
+  const costCenterSchema = z.object({
+    name: z.string().nonempty({ message: "Name is required" }),
+    description: z.string().optional(),
+    budget: z.string().optional(),
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    if (!name.trim()) {
-      setError("Name is required");
-      return;
-    }
+  type CostCenterFormValues = z.infer<typeof costCenterSchema>;
 
+  // Prepare default form values
+  const defaultValues = {
+    name: costCenter?.name || "",
+    description: costCenter?.description || "",
+    budget: costCenter?.budget || "",
+  };
+
+  // Initialize React Hook Form
+  const form = useForm<CostCenterFormValues>({
+    resolver: zodResolver(costCenterSchema),
+    defaultValues,
+    mode: "onBlur",
+  });
+
+  const onSubmit = async (data: CostCenterFormValues) => {
     try {
       if (isNew) {
         await createCostCenter({
-          name,
-          description,
-          budget: budget || undefined,
+          name: data.name,
+          description: data.description,
+          budget: data.budget || undefined,
         }).unwrap();
+        toast.success("Cost center created successfully");
         router.push("/dashboard/finances/cost-centers");
       } else if (costCenter) {
         await updateCostCenter({
           id: costCenter.id,
           costCenter: {
-            name,
-            description,
-            budget: budget || null,
+            name: data.name,
+            description: data.description || undefined,
+            budget: data.budget || null,
           },
         }).unwrap();
+        toast.success("Cost center updated successfully");
         router.push(`/dashboard/finances/cost-centers/${costCenter.id}`);
       }
     } catch (err: any) {
-      setError(
-        err?.data?.error ||
-          `Failed to ${isNew ? "create" : "update"} cost center`
+      console.error(err);
+      toast.error(
+        `Failed to ${isNew ? "create" : "update"} cost center: ${
+          err.data?.error || err.message
+        }`
       );
     }
   };
-
-  const isLoading = isCreating || isSaving;
 
   return (
     <Card>
@@ -100,38 +110,51 @@ export default function CostCenterFormClient({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-1">
             <Label htmlFor="name">Name</Label>
             <Input
               id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              {...form.register("name")}
               placeholder="Cost Center Name"
-              required
             />
+            {form.formState.errors.name && (
+              <p className="text-sm text-red-500">
+                {form.formState.errors.name.message}
+              </p>
+            )}
           </div>
+
           <div className="space-y-1">
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              {...form.register("description")}
               placeholder="Description (optional)"
             />
+            {form.formState.errors.description && (
+              <p className="text-sm text-red-500">
+                {form.formState.errors.description.message}
+              </p>
+            )}
           </div>
+
           <div className="space-y-1">
             <Label htmlFor="budget">Budget</Label>
             <Input
               id="budget"
               type="number"
               step="0.01"
-              value={budget}
-              onChange={(e) => setBudget(e.target.value)}
+              {...form.register("budget")}
               placeholder="0.00"
             />
+            {form.formState.errors.budget && (
+              <p className="text-sm text-red-500">
+                {form.formState.errors.budget.message}
+              </p>
+            )}
           </div>
-          {error && <p className="text-red-600">{error}</p>}
+
           <div className="pt-4 flex justify-between">
             <Button
               variant="outline"
@@ -143,6 +166,7 @@ export default function CostCenterFormClient({
                 )
               }
               type="button"
+              disabled={isLoading}
             >
               Cancel
             </Button>

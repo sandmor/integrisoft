@@ -37,6 +37,7 @@ import { format, parseISO } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import Link from "next/link";
 import { Spinner } from "@/components/ui/spinner";
+import { toast } from "sonner";
 import { transactionTypeEnum } from "@/lib/db/schema";
 
 export default function EditTransactionClient() {
@@ -98,6 +99,11 @@ export default function EditTransactionClient() {
       router.push(`/dashboard/finances/transactions/${id}`);
     } catch (error) {
       console.error("Failed to update transaction:", error);
+      toast.error(
+        `Failed to update transaction: ${
+          (error as any).data?.error || (error as any).message
+        }`
+      );
     }
   };
 

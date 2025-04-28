@@ -31,7 +31,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
-  if (!(await validateSession("read_tasks"))) {
+  if (!(await validateSession("project", "read"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
@@ -230,7 +230,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
-  const userId = await validateSession("write_tasks");
+  const userId = await validateSession("project", "write");
 
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

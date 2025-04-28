@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { transactionCategories, transactions } from "@/lib/db/schema";
 import { count, eq, and, not } from "drizzle-orm";
-import { auth } from "@/lib/auth";
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { TransactionCategoryDetail } from "@/lib/types";
 import { validateSession } from "@/lib/permission-handler";
@@ -13,7 +11,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await validateSession("read_categories"))) {
+  if (!(await validateSession("finance", "read"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
@@ -112,7 +110,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await validateSession("write_categories"))) {
+  if (!(await validateSession("finance", "write"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
@@ -304,7 +302,7 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await validateSession("write_categories"))) {
+  if (!(await validateSession("finance", "write"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {

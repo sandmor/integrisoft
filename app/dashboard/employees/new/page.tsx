@@ -1,14 +1,19 @@
 import Link from "next/link";
-import { getDepartments, getPositions } from "@/lib/actions/employees";
+import {
+  getDepartments,
+  getPositions,
+  getRoles,
+} from "@/lib/actions/employees";
 import { EmployeeForm } from "@/components/dashboard/employees/employee-form";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 
 export default async function NewEmployeePage() {
   // Fetch data server-side
-  const [departments, positions] = await Promise.all([
+  const [departments, positions, roles] = await Promise.all([
     getDepartments(),
     getPositions(),
+    getRoles(),
   ]);
 
   return (
@@ -35,6 +40,7 @@ export default async function NewEmployeePage() {
       <EmployeeForm
         departments={departments}
         positions={positions}
+        roles={roles}
         isEditing={false}
       />
     </div>

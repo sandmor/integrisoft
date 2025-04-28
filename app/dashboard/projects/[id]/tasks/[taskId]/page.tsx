@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { tasks, employees, milestones } from "@/lib/db/schema";
+import { tasks, employees } from "@/lib/db/schema";
 import { eq, and, not } from "drizzle-orm";
 import { CalendarDays, Clock, Edit, ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
@@ -57,20 +57,20 @@ export default async function TaskDetailPage({ params }: TaskDetailPageProps) {
     assignee = await db.query.employees.findFirst({
       where: eq(employees.id, task.assignedToId),
       with: {
-        users: true,
+        user: true,
       },
     });
 
-    if (assignee && assignee.users) {
-      const { users } = assignee;
+    if (assignee && assignee.user) {
+      const { user } = assignee;
       assigneeInfo = {
-        initials: users.name
-          ? users.name
+        initials: user.name
+          ? user.name
               .split(" ")
               .map((n) => n[0])
               .join("")
           : "UN",
-        name: users.name || "Unknown User",
+        name: user.name || "Unknown User",
       };
     }
   }

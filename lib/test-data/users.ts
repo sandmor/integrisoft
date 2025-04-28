@@ -21,7 +21,6 @@ export async function generateUsers(
     emailVerified: true,
     name: "Admin",
     lastName: "User",
-    role: "admin" as const,
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -62,11 +61,10 @@ export async function generateUsers(
       .values({
         id: userId,
         email: email,
-        emailVerified: Math.random() > 0.1, // 90% verified
+        emailVerified: Math.random() > 0.1,
         name: firstName,
         lastName: lastName,
-        role: role, // This is properly typed now because "roles" is declared as "const"
-        isActive: Math.random() > 0.05, // 95% active
+        isActive: Math.random() > 0.05,
         createdAt: faker.date.past({ years: 2 }),
         updatedAt: faker.date.recent({ days: 90 }),
         lastLogin: Math.random() > 0.2 ? faker.date.recent({ days: 30 }) : null,
@@ -244,7 +242,6 @@ async function generatePositionsForDepartment(
       "Operations Analyst",
       "Project Coordinator",
       "Logistics Specialist",
-      "COO",
     ],
     "Research & Development": [
       "Research Scientist",
@@ -264,7 +261,7 @@ async function generatePositionsForDepartment(
       "Legal Assistant",
       "General Counsel",
     ],
-    Executive: ["CEO", "CTO", "CFO", "COO", "CIO", "CHRO", "CMO"],
+    Executive: ["CEO", "CTO", "COO", "CIO", "CHRO", "CMO"],
   };
 
   // Default positions if department doesn't match any template
@@ -437,102 +434,112 @@ export async function generateEmployees(
   positionIds: string[]
 ): Promise<string[]> {
   const employeeIds: string[] = [];
-
-  // Get departments with associated positions
-  const departments = await Promise.all(
+  // Exclude global admin (first user)
+  const [, ...otherUsers] = userIds;
+  // Prepare executive unique positions (only one per title)
+  const execTitles = ["CEO", "CTO", "CFO", "COO", "CIO", "CHRO", "CMO"];
+  const allPositions = await tx.query.positions.findMany();
+  const execUniqueIds = new Set(
+    allPositions.filter((p) => execTitles.includes(p.title)).map((p) => p.id)
+  );
+  const assignedExec = new Set<string>();
+  // Fetch department names
+  const allDepts = await tx.query.departments.findMany();
+  const deptNamesMap = Object.fromEntries(allDepts.map((d) => [d.id, d.name]));
+  // Map departments to their positions and remember names
+  const deptMap = await Promise.all(
     departmentIds.map(async (deptId) => {
       const positions = await tx.query.positions.findMany({
         where: eq(schema.positions.departmentId, deptId),
       });
-
       return {
-        departmentId: deptId,
+        deptId,
+        deptName: deptNamesMap[deptId] || "",
         positions: positions.map((p) => p.id),
       };
     })
   );
 
-  // Generate employees for each user
-  for (const userId of userIds) {
-    // 80% of users are employees
-    if (Math.random() > 0.2) {
-      const employeeId = createId();
-
-      // Get user info
-      const user = await tx.query.users.findFirst({
-        where: eq(schema.users.id, userId),
-      });
-
-      if (!user) continue;
-
-      // Random department
-      const deptIndex = Math.floor(Math.random() * departments.length);
-      const department = departments[deptIndex];
-
-      // Random position from the department
-      const positionId =
-        department.positions.length > 0
-          ? department.positions[
-              Math.floor(Math.random() * department.positions.length)
-            ]
-          : null; // Some employees might not have a defined position
-
-      // Hire date between 5 years ago and 1 month ago
-      const hireDate = faker.date.between({
-        from: new Date(Date.now() - 5 * 365 * 24 * 60 * 60 * 1000), // 5 years ago
-        to: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 1 month ago
-      });
-
-      // Salary based on role and random variation
-      let baseSalary;
-      if (user.role === "admin") {
-        baseSalary = 120000 + Math.floor(Math.random() * 80000); // 120k-200k
-      } else if (user.role === "manager") {
-        baseSalary = 90000 + Math.floor(Math.random() * 50000); // 90k-140k
+  for (let idx = 0; idx < otherUsers.length; idx++) {
+    const userId = otherUsers[idx];
+    const { deptId, deptName, positions } = deptMap[idx % deptMap.length];
+    let positionId: string | null = null;
+    // Executive department: assign unique exec titles only once
+    if (deptName === "Executive") {
+      const availableExec = positions.filter(
+        (pid) => execUniqueIds.has(pid) && !assignedExec.has(pid)
+      );
+      if (availableExec.length > 0) {
+        positionId = availableExec[0];
+        assignedExec.add(positionId);
       } else {
-        baseSalary = 60000 + Math.floor(Math.random() * 40000); // 60k-100k
+        // fallback to non-exec positions
+        const nonExec = positions.filter((pid) => !execUniqueIds.has(pid));
+        if (nonExec.length > 0) {
+          positionId = nonExec[Math.floor(Math.random() * nonExec.length)];
+        }
       }
-
-      // Add contact info
-      const contactEmail = faker.internet.email({
-        firstName: user.name,
-        lastName: user.lastName,
-      });
-      const contactPhone = faker.phone.number();
-      const address = faker.location.streetAddress({ useFullAddress: true });
-
-      // Emergency contact
-      const emergencyFirstName = faker.person.firstName();
-      const emergencyLastName = faker.person.lastName();
-      const emergencyContact = `Name: ${emergencyFirstName} ${emergencyLastName}, Relationship: ${
-        ["Spouse", "Partner", "Parent", "Sibling", "Friend"][
-          Math.floor(Math.random() * 5)
-        ]
-      }, Phone: ${faker.phone.number()}`;
-
-      await tx
-        .insert(schema.employees)
-        .values({
-          id: employeeId,
-          userId: userId,
-          positionId: positionId,
-          departmentId: department.departmentId,
-          hireDate: hireDate,
-          salary: baseSalary.toString(),
-          contactEmail: contactEmail,
-          contactPhone: contactPhone,
-          address: address,
-          emergencyContact: emergencyContact,
-          createdAt: hireDate,
-          updatedAt: faker.date.recent({ days: 90 }),
-          isDeleted: false,
-        })
-        .execute();
-
-      employeeIds.push(employeeId);
+    } else {
+      // Regular department: random position
+      if (positions.length > 0) {
+        positionId = positions[Math.floor(Math.random() * positions.length)];
+      }
     }
+    const employeeId = createId();
+    // Hire date 1-60 months ago
+    const hireDate = faker.date.between({
+      from: new Date(Date.now() - 60 * 30 * 24 * 60 * 60 * 1000),
+      to: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+    });
+    // Salary by position level
+    let baseSalary = 60000;
+    const pos = positionId
+      ? await tx.query.positions.findFirst({
+          where: eq(schema.positions.id, positionId),
+        })
+      : null;
+    const title = pos?.title.toLowerCase();
+    if (title?.includes("chief") || title?.includes("director"))
+      baseSalary = 150000 + faker.number.int({ min: 0, max: 100000 });
+    else if (title?.includes("manager") || title?.includes("lead"))
+      baseSalary = 90000 + faker.number.int({ min: 0, max: 50000 });
+    else if (title?.includes("senior"))
+      baseSalary = 80000 + faker.number.int({ min: 0, max: 40000 });
+    else if (title?.includes("junior"))
+      baseSalary = 50000 + faker.number.int({ min: 0, max: 30000 });
+    else baseSalary = 60000 + faker.number.int({ min: 0, max: 40000 });
+    // Contact info
+    const [user] = await tx.query.users.findMany({
+      where: eq(schema.users.id, userId),
+    });
+    const contactEmail = faker.internet.email({
+      firstName: user.name,
+      lastName: user.lastName,
+    });
+    await tx
+      .insert(schema.employees)
+      .values({
+        id: employeeId,
+        userId,
+        departmentId: deptId,
+        positionId,
+        hireDate,
+        salary: baseSalary.toString(),
+        contactEmail,
+        contactPhone: faker.phone.number(),
+        address: faker.location.streetAddress({ useFullAddress: true }),
+        emergencyContact: `Name: ${faker.person.fullName()}, Relationship: ${
+          ["Partner", "Parent", "Sibling", "Friend"][
+            Math.floor(Math.random() * 4)
+          ]
+        }, Phone: ${faker.phone.number()}`,
+        createdAt: hireDate,
+        updatedAt: faker.date.recent({ days: 90 }),
+        isDeleted: false,
+      })
+      .execute();
+    employeeIds.push(employeeId);
   }
-
   return employeeIds;
 }
 
@@ -560,28 +567,27 @@ export async function generateEmployeeSkills(
 
   // For each employee, assign 3-12 skills
   for (const employeeId of employeeIds) {
-    // Get employee info for more contextual skill assignment
     const employee = await tx.query.employees.findFirst({
       where: eq(schema.employees.id, employeeId),
       with: {
-        positions: true,
-        departments: true,
-        users: true,
+        position: true,
+        department: true,
+        user: true,
       },
     });
 
     if (!employee) continue;
 
-    const position = employee.positions;
-    const department = employee.departments;
-    const user = employee.users;
+    const position = employee.position;
+    const department = employee.department;
+    const user = employee.user;
 
     // Determine skill count based on role and random variation
     let skillCount;
     if (
-      user?.role === "admin" ||
-      (position?.title &&
-        (position.title.includes("Senior") || position.title.includes("Lead")))
+      // admin role not stored on user entity; use senior/lead positions for skill weighting
+      position?.title &&
+      (position.title.includes("Senior") || position.title.includes("Lead"))
     ) {
       skillCount = 7 + Math.floor(Math.random() * 6); // 7-12 skills for senior positions
     } else {
@@ -599,25 +605,19 @@ export async function generateEmployeeSkills(
         const proficiency = 1 + Math.floor(Math.random() * 5); // 1-5 proficiency
         const yearsExperience = 0.5 + Math.random() * 10; // 0.5-10.5 years
 
-        try {
-          await tx
-            .insert(schema.employeeSkills)
-            .values({
-              id: createId(), // Ensure every record has an ID
-              employeeId: employeeId,
-              skillId: skillId,
-              proficiencyLevel: proficiency,
-              yearsExperience: yearsExperience.toString(), // Convert to string to match decimal type
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            })
-            .execute();
+        await tx
+          .insert(schema.employeeSkills)
+          .values({
+            employeeId: employeeId,
+            skillId: skillId,
+            proficiencyLevel: proficiency,
+            yearsExperience: yearsExperience.toString(), // Convert to string to match decimal type
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .execute();
 
-          assignedSkills.add(skillId);
-        } catch (error) {
-          console.error("Error adding skill:", error);
-          console.log("Employee ID:", employeeId, "Skill ID:", skillId);
-        }
+        assignedSkills.add(skillId);
       }
     };
 
@@ -656,13 +656,11 @@ export async function generateEmployeeSkills(
 
     // Management skills for managers or higher roles
     if (
-      user?.role === "admin" ||
-      user?.role === "manager" ||
-      (position?.title &&
-        (position.title.includes("Manager") ||
-          position.title.includes("Director") ||
-          position.title.includes("Lead") ||
-          position.title.includes("Chief")))
+      position?.title &&
+      (position.title.includes("Manager") ||
+        position.title.includes("Director") ||
+        position.title.includes("Lead") ||
+        position.title.includes("Chief"))
     ) {
       for (const skillId of skillsByCategory["Management"] || []) {
         await addSkill(skillId, 1.3);
@@ -695,7 +693,6 @@ export async function generateEmployeeSkills(
           await tx
             .insert(schema.employeeSkills)
             .values({
-              id: createId(), // Ensure ID is provided
               employeeId: employeeId,
               skillId: primaryLanguage,
               proficiencyLevel: proficiency,
@@ -743,7 +740,6 @@ export async function generateEmployeeSkills(
             await tx
               .insert(schema.employeeSkills)
               .values({
-                id: createId(), // Ensure ID is provided
                 employeeId: employeeId,
                 skillId: randomSkill,
                 proficiencyLevel: proficiency,
@@ -774,34 +770,27 @@ export async function assignDepartmentManagers(
   departmentIds: string[],
   employeeIds: string[]
 ) {
-  // Get employees who could be managers
   const potentialManagers = await Promise.all(
     employeeIds.map(async (empId) => {
-      // Use explicit type for the query result
       const employee = await tx.query.employees.findFirst({
         where: eq(schema.employees.id, empId),
         with: {
-          users: true,
-          positions: true,
+          user: true,
+          position: true,
         },
       });
 
-      // Calculate "manager potential" based on role, position title, and skills
       let managerPotential = 0;
 
-      // Higher score for admin/manager roles
-      if (employee?.users?.role === "admin") managerPotential += 100;
-      if (employee?.users?.role === "manager") managerPotential += 70;
-
-      // Higher score for management positions
-      if (employee?.positions?.title) {
-        if (employee.positions.title.includes("Director"))
+      // Higher score for management positions only
+      if (employee?.position?.title) {
+        if (employee.position.title.includes("Director"))
           managerPotential += 80;
-        else if (employee.positions.title.includes("Manager"))
+        else if (employee.position.title.includes("Manager"))
           managerPotential += 60;
-        else if (employee.positions.title.includes("Lead"))
+        else if (employee.position.title.includes("Lead"))
           managerPotential += 50;
-        else if (employee.positions.title.includes("Senior"))
+        else if (employee.position.title.includes("Senior"))
           managerPotential += 30;
       }
 
@@ -877,6 +866,225 @@ export async function assignDepartmentManagers(
         .set({ managerId: randomEmployee })
         .where(eq(schema.departments.id, department))
         .execute();
+    }
+  }
+}
+
+// Generate roles including Admin, and department-specific Manager/Employee, plus position-specific
+export async function generateRoles(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  departmentIds: string[],
+  positionIds: string[]
+): Promise<{
+  genericAdmin: string;
+  position: Record<string, string>;
+  department: Record<string, { manager: string; employee: string }>;
+}> {
+  // Create global Admin role
+  const adminRoleId = createId();
+  await tx
+    .insert(schema.roles)
+    .values({
+      id: adminRoleId,
+      name: "Admin",
+      description: "Global administrator",
+    })
+    .execute();
+
+  // Department-specific roles
+  const departmentRoles: Record<string, { manager: string; employee: string }> =
+    {};
+  for (const deptId of departmentIds) {
+    const dept = await tx.query.departments.findFirst({
+      where: eq(schema.departments.id, deptId),
+    });
+    if (!dept) continue;
+    const deptName = dept.name;
+    // Manager role
+    const mgrRole = createId();
+    await tx
+      .insert(schema.roles)
+      .values({
+        id: mgrRole,
+        name: `${deptName} Manager`,
+        description: `Manager of ${deptName}`,
+      })
+      .execute();
+    // Employee role
+    const empRole = createId();
+    await tx
+      .insert(schema.roles)
+      .values({
+        id: empRole,
+        name: `${deptName} Employee`,
+        description: `Employee in ${deptName}`,
+      })
+      .execute();
+    departmentRoles[deptId] = { manager: mgrRole, employee: empRole };
+  }
+
+  // Position-based roles
+  const positionRoles: Record<string, string> = {};
+  for (const posId of positionIds) {
+    const pos = await tx.query.positions.findFirst({
+      where: eq(schema.positions.id, posId),
+    });
+    // Skip any 'Manager' positions as they already have a department-manager role
+    if (pos?.title.toLowerCase().includes("manager")) continue;
+    if (pos) {
+      const roleId = createId();
+      await tx
+        .insert(schema.roles)
+        .values({
+          id: roleId,
+          name: pos.title,
+          description: `${pos.title} role`,
+        })
+        .execute();
+      positionRoles[posId] = roleId;
+    }
+  }
+
+  return {
+    genericAdmin: adminRoleId,
+    position: positionRoles,
+    department: departmentRoles,
+  };
+}
+
+// Assign roles to users: global Admin to first user, department-specific for others
+export async function assignUserRoles(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  userIds: string[],
+  genericAdmin: string,
+  positionRoles: Record<string, string>,
+  departmentRoles: Record<string, { manager: string; employee: string }>
+) {
+  // Admin role to first user
+  if (userIds.length > 0) {
+    await tx
+      .insert(schema.userRoles)
+      .values({ userId: userIds[0], roleId: genericAdmin })
+      .execute();
+  }
+  // Fetch employees
+  const employees = await tx.query.employees.findMany();
+  for (const emp of employees) {
+    const userId = emp.userId!;
+    const deptId = emp.departmentId!;
+    // Department Employee role
+    const deptRoles = departmentRoles[deptId];
+    if (deptRoles) {
+      await tx
+        .insert(schema.userRoles)
+        .values({ userId, roleId: deptRoles.employee })
+        .execute();
+    }
+    // Position-specific role
+    const posRole = emp.positionId ? positionRoles[emp.positionId] : undefined;
+    if (posRole) {
+      await tx
+        .insert(schema.userRoles)
+        .values({ userId, roleId: posRole })
+        .execute();
+    }
+  }
+  // Department Manager roles
+  const depts = await tx
+    .select({
+      id: schema.departments.id,
+      managerId: schema.users.id,
+    })
+    .from(schema.departments)
+    .innerJoin(
+      schema.employees,
+      eq(schema.departments.managerId, schema.employees.id)
+    )
+    .innerJoin(schema.users, eq(schema.employees.userId, schema.users.id));
+  for (const dept of depts) {
+    const roles = departmentRoles[dept.id];
+    if (roles) {
+      await tx
+        .insert(schema.userRoles)
+        .values({ userId: dept.managerId, roleId: roles.manager })
+        .execute();
+    }
+  }
+}
+
+// Generate all permissions for modules and levels
+export async function generatePermissions(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0]
+): Promise<Record<string, Record<string, string>>> {
+  const modules = [
+    "user",
+    "project",
+    "finance",
+    "product",
+    "client",
+    "reporting",
+    "admin",
+  ];
+  const levels = ["read", "write", "admin"];
+  const permMap: Record<string, Record<string, string>> = {};
+  for (const mod of modules) {
+    permMap[mod] = {};
+    for (const level of levels) {
+      const permId = createId();
+      await tx
+        .insert(schema.permissions)
+        .values({ id: permId, module: mod as any, accessLevel: level as any })
+        .execute();
+      permMap[mod][level] = permId;
+    }
+  }
+  return permMap;
+}
+
+// Assign permissions to roles: admin gets all, department roles get read/write and admin on own module
+export async function assignRolePermissions(
+  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  permMap: Record<string, Record<string, string>>,
+  genericAdmin: string,
+  departmentRoles: Record<string, { manager: string; employee: string }>
+) {
+  // Admin full access
+  for (const mod of Object.keys(permMap)) {
+    await tx
+      .insert(schema.rolePermissions)
+      .values({ roleId: genericAdmin, permissionId: permMap[mod]["admin"] })
+      .execute();
+  }
+  // Department roles
+  for (const [deptId, roles] of Object.entries(departmentRoles)) {
+    // Determine module matching department (lowercased)
+    const dept = await tx.query.departments.findFirst({
+      where: eq(schema.departments.id, deptId),
+    });
+    const deptNameLower = dept?.name.toLowerCase();
+    const modKey =
+      deptNameLower && permMap[deptNameLower] ? deptNameLower : undefined;
+    for (const mod of Object.keys(permMap)) {
+      // Employee: read-only
+      await tx
+        .insert(schema.rolePermissions)
+        .values({ roleId: roles.employee, permissionId: permMap[mod]["read"] })
+        .execute();
+      // Manager: read & write
+      await tx
+        .insert(schema.rolePermissions)
+        .values({ roleId: roles.manager, permissionId: permMap[mod]["write"] })
+        .execute();
+      // Manager own module: admin
+      if (mod === modKey) {
+        await tx
+          .insert(schema.rolePermissions)
+          .values({
+            roleId: roles.manager,
+            permissionId: permMap[mod]["admin"],
+          })
+          .execute();
+      }
     }
   }
 }

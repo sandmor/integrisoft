@@ -10,6 +10,10 @@ import {
   generateEmployees,
   generateEmployeeSkills,
   assignDepartmentManagers,
+  generateRoles,
+  generatePermissions,
+  assignRolePermissions,
+  assignUserRoles,
 } from "./users";
 import {
   generateCostCenters,
@@ -91,6 +95,28 @@ export async function populateTestData(
 
     console.log("Setting department managers...");
     await assignDepartmentManagers(tx, departmentIds, employeeIds);
+
+    console.log("Generating roles...");
+    const {
+      genericAdmin,
+      position: positionRoles,
+      department: departmentRoles,
+    } = await generateRoles(tx, departmentIds, positionIds);
+
+    console.log("Generating permissions...");
+    const permMap = await generatePermissions(tx);
+
+    console.log("Assigning permissions to roles...");
+    await assignRolePermissions(tx, permMap, genericAdmin, departmentRoles);
+
+    console.log("Assigning user roles...");
+    await assignUserRoles(
+      tx,
+      userIds,
+      genericAdmin,
+      positionRoles,
+      departmentRoles
+    );
 
     console.log("Generating cost centers...");
     const costCenterIds = await generateCostCenters(tx, departmentIds);

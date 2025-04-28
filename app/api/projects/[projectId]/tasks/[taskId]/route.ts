@@ -29,7 +29,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string; taskId: string }> }
 ) {
-  if (!(await validateSession("read_tasks"))) {
+  if (!(await validateSession("project", "read"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
@@ -128,7 +128,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string; taskId: string }> }
 ) {
-  const userId = await validateSession("write_tasks");
+  const userId = await validateSession("project", "write");
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -317,7 +317,7 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string; taskId: string }> }
 ) {
-  if (!(await validateSession("write_tasks"))) {
+  if (!(await validateSession("project", "write"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {

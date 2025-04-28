@@ -1,20 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import {
-  costCenters,
-  departments,
-  budgets,
-  transactions,
-} from "@/lib/db/schema";
+import { costCenters, departments } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { validateSession } from "@/lib/permission-handler";
-import { headers } from "next/headers";
-import { revalidatePath } from "next/cache";
 import { getCostCentersList } from "@/lib/actions/finances";
+import { revalidatePath } from "next/cache";
 
-// GET /api/finances/cost-centers - Get all cost centers
+// GET /api/finances/cost-centers - Get all cost centers with pagination
 export async function GET(req: NextRequest) {
-  if (!(await validateSession("read_cost_centers"))) {
+  if (!(await validateSession("finance", "read"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
@@ -41,7 +35,7 @@ export async function GET(req: NextRequest) {
 
 // POST /api/finances/cost-centers - Create a new cost center
 export async function POST(req: NextRequest) {
-  if (!(await validateSession("write_cost_centers"))) {
+  if (!(await validateSession("finance", "write"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {

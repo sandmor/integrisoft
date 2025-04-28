@@ -8,7 +8,7 @@ import { validateSession } from "@/lib/permission-handler";
 
 // GET /api/finances/budgets - Get all budgets with filtering, sorting and pagination
 export async function GET(req: NextRequest) {
-  if (!(await validateSession("read_budgets"))) {
+  if (!(await validateSession("finance", "read"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {
@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
 
 // POST /api/finances/budgets - Create a new budget
 export async function POST(req: NextRequest) {
-  if (!(await validateSession("write_budgets"))) {
+  if (!(await validateSession("finance", "write"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {

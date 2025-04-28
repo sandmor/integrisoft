@@ -12,7 +12,7 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
-  if (!(await validateSession("write_tasks"))) {
+  if (!(await validateSession("project", "write"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   try {

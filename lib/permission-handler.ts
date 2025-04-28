@@ -57,3 +57,58 @@ export async function validateSession(
   ).limit(1);
   return hasPermission.userId;
 }
+
+/**
+ * Get all modules a user has at least "read" access to
+ * @param userId Optional user ID to check permissions for, defaults to current user from session
+ * @returns Array of module names the user has permission to access
+ */
+export async function getUserAccessibleModules(
+  userId?: string
+): Promise<(typeof moduleTypeEnum.enumValues)[number][]> {
+  // If no userId is provided, get it from the session
+  let userIdToUse = userId;
+  if (!userIdToUse) {
+    const session = await auth.api.getSession({ headers: await headers() });
+    userIdToUse = session?.user?.id;
+  }
+
+  // If still no userId, return empty array (no permissions)
+  if (!userIdToUse) {
+    return [];
+  }
+
+  // Check if this is an admin user (always has access to everything)
+  const adminUser = await db
+    .select()
+    .from(users)
+    .where(
+      and(eq(users.id, userIdToUse), eq(users.email, "admin@integrisoft.com"))
+    )
+    .limit(1);
+
+  if (adminUser.length > 0) {
+    // Admin user has access to all modules
+    return [...moduleTypeEnum.enumValues];
+  }
+
+  // Get all modules the user has at least "read" permission for
+  const userModules = await db
+    .selectDistinct({ module: permissions.module })
+    .from(users)
+    .where(
+      and(
+        eq(users.id, userIdToUse),
+        not(eq(users.isDeleted, true)),
+        gte(permissions.accessLevel, "read")
+      )
+    )
+    .innerJoin(userRoles, eq(userRoles.userId, users.id))
+    .innerJoin(rolePermissions, eq(rolePermissions.roleId, userRoles.roleId))
+    .innerJoin(permissions, eq(permissions.id, rolePermissions.permissionId));
+
+  return userModules.map(
+    (item: { module: (typeof moduleTypeEnum.enumValues)[number] }) =>
+      item.module
+  );
+}

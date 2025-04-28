@@ -11,7 +11,6 @@ export async function generateUsers(
   count: number
 ): Promise<string[]> {
   const userIds: string[] = [];
-  const roles = ["admin", "manager", "employee"] as const;
   const password = await (await auth.$context).password.hash("MyPassword123");
 
   // Create admin user first
@@ -47,7 +46,6 @@ export async function generateUsers(
   for (let i = 0; i < count - 1; i++) {
     const firstName = faker.person.firstName();
     const lastName = faker.person.lastName();
-    const role = roles[Math.floor(Math.random() * roles.length)];
 
     const userId = createId();
     const email = faker.internet.email({
@@ -61,10 +59,10 @@ export async function generateUsers(
       .values({
         id: userId,
         email: email,
-        emailVerified: Math.random() > 0.1,
+        emailVerified: true,
         name: firstName,
         lastName: lastName,
-        isActive: Math.random() > 0.05,
+        isActive: true,
         createdAt: faker.date.past({ years: 2 }),
         updatedAt: faker.date.recent({ days: 90 }),
         lastLogin: Math.random() > 0.2 ? faker.date.recent({ days: 30 }) : null,
@@ -76,6 +74,7 @@ export async function generateUsers(
 
     // Create credentials account for user
     if (Math.random() < 0.7 || true) {
+      console.log("Creating credential account for user:", userId);
       await tx
         .insert(schema.accounts)
         .values({

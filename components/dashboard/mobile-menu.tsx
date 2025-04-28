@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Menu, X, Home } from "lucide-react";
+import { Menu, Home } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNavigation } from "@/components/ui/navigation-context";
 import { Button } from "@/components/ui/button";
@@ -14,13 +14,27 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { sidebarItems } from "@/components/dashboard/sidebar";
+import {
+  filterMenuItemsByPermission,
+  navigationItems,
+  ModulePermission,
+} from "@/lib/menu-config";
 
-export function MobileMenu() {
+interface MobileMenuProps {
+  accessibleModules: ModulePermission[];
+}
+
+export function MobileMenu({ accessibleModules }: MobileMenuProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const { startNavigation } = useNavigation();
+
+  // Filter menu items based on user permissions
+  const filteredItems = filterMenuItemsByPermission(
+    navigationItems,
+    accessibleModules
+  );
 
   // Handle navigation with progress indicator
   const handleNavigation = (href: string, e: React.MouseEvent) => {
@@ -56,7 +70,7 @@ export function MobileMenu() {
           </SheetTitle>
         </SheetHeader>
         <div className="flex flex-col gap-0.5 p-4">
-          {sidebarItems.map((item) => (
+          {filteredItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}

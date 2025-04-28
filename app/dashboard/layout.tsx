@@ -6,6 +6,8 @@ import { MobileMenu } from "@/components/dashboard/mobile-menu";
 import { getEntityNameById } from "@/lib/actions/dashboard";
 import StoreProvider from "../../components/providers/store-provider";
 import UserMenu from "@/components/dashboard/user-menu";
+import { getUserAccessibleModules } from "@/lib/permission-handler";
+import { ModulePermission } from "@/lib/menu-config";
 
 export default async function DashboardLayout({
   children,
@@ -19,6 +21,10 @@ export default async function DashboardLayout({
     headers: headersList,
   });
   const userName = session?.user?.name || "User";
+  const userId = session?.user?.id;
+
+  // Get user accessible modules
+  const accessibleModules = await getUserAccessibleModules(userId);
 
   // Get pathname from headers on the server
   const pathname =
@@ -47,18 +53,18 @@ export default async function DashboardLayout({
   return (
     <StoreProvider>
       <div className="flex min-h-screen">
-        {/* Sidebar */}
-        <DashboardSidebar />
+        {/* Sidebar with accessible modules */}
+        <DashboardSidebar accessibleModules={accessibleModules} />
 
         {/* Main content */}
         <div className="flex flex-col flex-1 lg:ml-64">
           {/* Header */}
           <header className="bg-background border-b h-16 flex items-center justify-between px-6 sticky top-0 z-10">
             <div className="flex flex-1 items-center space-x-2">
-              <MobileMenu />
+              <MobileMenu accessibleModules={accessibleModules} />
               <span className="text-sm font-medium">Welcome, {userName}</span>
               <div className="flex-1" />
-              <UserMenu />
+              <UserMenu accessibleModules={accessibleModules} />
             </div>
           </header>
 

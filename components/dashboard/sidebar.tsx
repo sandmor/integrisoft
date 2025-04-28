@@ -1,75 +1,30 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import {
-  BarChart3,
-  Building2,
-  CreditCard,
-  FileBox,
-  Home,
-  LayoutDashboard,
-  PackageOpen,
-  Settings,
-  Users,
-} from "lucide-react";
+import { Home } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useNavigation } from "@/components/ui/navigation-context";
 import Link from "next/link";
+import {
+  filterMenuItemsByPermission,
+  navigationItems,
+  ModulePermission,
+} from "@/lib/menu-config";
 
-interface SidebarItem {
-  title: string;
-  icon: React.ReactNode;
-  href: string;
+interface DashboardSidebarProps {
+  accessibleModules: ModulePermission[];
 }
 
-// Use the dashboard modules to generate sidebar items
-export const sidebarItems: SidebarItem[] = [
-  {
-    title: "Dashboard",
-    icon: <LayoutDashboard className="size-5" />,
-    href: "/dashboard",
-  },
-  {
-    title: "Employees",
-    icon: <Users className="size-5" />,
-    href: "/dashboard/employees",
-  },
-  {
-    title: "Finances",
-    icon: <CreditCard className="size-5" />,
-    href: "/dashboard/finances",
-  },
-  {
-    title: "Products",
-    icon: <PackageOpen className="size-5" />,
-    href: "/dashboard/products",
-  },
-  {
-    title: "Projects",
-    icon: <FileBox className="size-5" />,
-    href: "/dashboard/projects",
-  },
-  {
-    title: "Clients",
-    icon: <Building2 className="size-5" />,
-    href: "/dashboard/clients",
-  },
-  {
-    title: "Reports",
-    icon: <BarChart3 className="size-5" />,
-    href: "/dashboard/reports",
-  },
-  {
-    title: "Settings",
-    icon: <Settings className="size-5" />,
-    href: "/dashboard/settings",
-  },
-];
-
-export function DashboardSidebar() {
+export function DashboardSidebar({ accessibleModules }: DashboardSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { startNavigation } = useNavigation();
+
+  // Filter menu items based on user permissions
+  const filteredItems = filterMenuItemsByPermission(
+    navigationItems,
+    accessibleModules
+  );
 
   // Handle sidebar navigation with progress indicator
   const handleNavigation = (href: string, e: React.MouseEvent) => {
@@ -93,7 +48,7 @@ export function DashboardSidebar() {
         </Link>
       </div>
       <nav className="flex flex-col gap-0.5 p-4">
-        {sidebarItems.map((item) => (
+        {filteredItems.map((item) => (
           <Link
             key={item.href}
             href={item.href}

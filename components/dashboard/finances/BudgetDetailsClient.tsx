@@ -76,7 +76,10 @@ export default function BudgetDetailsClient({
           </Link>
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button variant="destructive">Delete</Button>
+              <Button variant="destructive">
+                <Trash className="mr-2 h-4 w-4" />
+                Delete
+              </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -95,7 +98,14 @@ export default function BudgetDetailsClient({
                   onClick={handleDelete}
                   disabled={isDeleting}
                 >
-                  {isDeleting ? "Deleting..." : "Delete"}
+                  {isDeleting ? (
+                    "Deleting..."
+                  ) : (
+                    <>
+                      <Trash className="mr-2 h-4 w-4" />
+                      Delete
+                    </>
+                  )}
                 </Button>
               </DialogFooter>
             </DialogContent>

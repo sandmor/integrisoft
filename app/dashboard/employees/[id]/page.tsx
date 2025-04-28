@@ -20,6 +20,7 @@ import {
   Calendar,
   DollarSign,
 } from "lucide-react";
+import DeleteEmployeeButton from "@/components/dashboard/employees/DeleteEmployeeButton";
 
 export default async function EmployeePage({
   params,
@@ -47,12 +48,16 @@ export default async function EmployeePage({
             </Link>
           </Button>
         </div>
-        <Button asChild>
-          <Link href={`/dashboard/employees/${employee.id}/edit`}>
-            <FileEdit className="mr-2 h-4 w-4" />
-            Edit Employee
-          </Link>
-        </Button>
+        {/* header actions */}
+        <div className="flex space-x-2">
+          <Button asChild>
+            <Link href={`/dashboard/employees/${employee.id}/edit`}>
+              <FileEdit className="mr-2 h-4 w-4" />
+              Edit Employee
+            </Link>
+          </Button>
+          <DeleteEmployeeButton employeeId={employee.id} />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

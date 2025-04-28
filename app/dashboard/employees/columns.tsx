@@ -63,9 +63,6 @@ export const columns: ColumnDef<Employee>[] = [
               <FileEdit className="h-4 w-4" />
             </Button>
           </Link>
-          <Button variant="ghost" size="icon" title="Delete">
-            <Trash2 className="h-4 w-4" />
-          </Button>
         </div>
       );
     },

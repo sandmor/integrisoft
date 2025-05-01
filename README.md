@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🌟 Integrisoft ERP
 
-## Getting Started
+> A sleek, modular Enterprise Resource Planning (ERP) system to streamline your business operations.
 
-First, run the development server:
+**Integrisoft** unifies CRM, Projects, HR, Finance, Products, and Reporting into a single Next.js + TypeScript application with a modern, responsive UI powered by ShadCN and Tailwind CSS.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🚀 Key Features
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Modular Architecture**: Pluggable dashboards for Clients, Projects, Employees, Finances, Products, and Reports.
+- **Rich UI Components**: Built with ShadCN UI, Recharts, and Radix primitives for consistency and accessibility.
+- **Real-time Data**: Redux Toolkit + RTK Query for efficient state management and caching.
+- **Robust Backend**: Next.js API routes with Drizzle ORM for type-safe database queries on PostgreSQL.
+- **Customizable Reports**: Pre-built and user-defined report templates with scheduling support.
+- **Notifications & Activity Feed**: Track changes and alerts with an integrated notifications system.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 📦 Modules Breakdown
 
-## Learn More
+- **CRM**: Clients, Contacts, Service Level Agreements, Interactions.
+- **Projects**: Projects, Milestones, Tasks, Kanban, Metrics.
+- **HR**: Employees, Departments, Positions, Skills, Roles & Permissions.
+- **Finance**: Transactions, Budgets, Cost Centers, Reports & Dashboard.
+- **Products**: Products, Versions, Dependencies, Technical Specs.
+- **Reporting**: Saved Reports, Custom Builders, Scheduling & Exports.
 
-To learn more about Next.js, take a look at the following resources:
+## 🛠 Tech Stack
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Frontend: Next.js (App Router), React, TypeScript, ShadCN UI, Tailwind CSS
+- State & API: Redux Toolkit, RTK Query
+- Backend: Next.js API Routes (Route Handlers)
+- Database: PostgreSQL, Drizzle ORM & Migrations
+- Charts & Visuals: Recharts, Lucide Icons
+- Testing & Data: Faker-driven test suites for development
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## ⚡ Getting Started
 
-## Deploy on Vercel
+1. Clone the repo:
+   ```bash
+   git clone https://github.com/your-org/integrisoft.git
+   cd integrisoft
+   ```
+2. Install dependencies:
+   ```bash
+   pnpm install
+   # or npm install
+   ```
+3. Configure environment variables:
+   - Copy `.env.example` to `.env`
+   - Update your database connection string
+4. Apply database migrations using Drizzle Kit:
+   ```bash
+   npx drizzle-kit push
+   ```
+5. Start the development server:
+   ```bash
+   pnpm dev
+   ```
+6. Seed test data via API endpoint:
+   ```bash
+   curl http://localhost:3000/api/danger
+   ```
+7. Visit `http://localhost:3000`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 📄 License
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Distributed under the MIT License. See [LICENSE](LICENSE) for more information.
